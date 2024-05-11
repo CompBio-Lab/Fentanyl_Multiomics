@@ -1,0 +1,140 @@
+/scratch/st-singha53-1/rishikad/snrnaseq/1_fastqc
+sh fastqc.sh /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq
+/arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R3/GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R3/GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R16/GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R16/GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R15/GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R15/GEX-R15-AS-12162022_S3_L001_R1_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R4/GEX-R4-AS-12162022_S2_L001_R1_001.fastq.gz /arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R4/GEX-R4-AS-12162022_S2_L001_R2_001.fastq.gz
+/arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R3/GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Started analysis of GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 5% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 10% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 15% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 20% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 25% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 30% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 35% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 40% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 45% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 50% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 55% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 60% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 65% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 70% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 75% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 80% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 85% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 90% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Approx 95% complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+Analysis complete for GEX-R3-AS-12162022_S1_L001_R2_001.fastq.gz
+/arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R3/GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Started analysis of GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 5% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 10% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 15% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 20% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 25% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 30% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 35% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 40% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 45% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 50% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 55% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 60% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 65% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 70% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 75% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 80% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 85% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 90% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Approx 95% complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+Analysis complete for GEX-R3-AS-12162022_S1_L001_R1_001.fastq.gz
+/arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R16/GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Started analysis of GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 5% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 10% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 15% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 20% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 25% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 30% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 35% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 40% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 45% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 50% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 55% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 60% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 65% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 70% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 75% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 80% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 85% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 90% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Approx 95% complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+Analysis complete for GEX-R16-AS-12162022_S4_L001_R1_001.fastq.gz
+/arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R16/GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Started analysis of GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 5% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 10% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 15% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 20% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 25% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 30% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 35% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 40% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 45% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 50% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 55% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 60% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 65% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 70% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 75% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 80% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 85% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 90% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Approx 95% complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+Analysis complete for GEX-R16-AS-12162022_S4_L001_R2_001.fastq.gz
+/arc/project/st-singha53-1/datasets/fentanyl/scrnaseq/R15/GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Started analysis of GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 5% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 10% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 15% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 20% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 25% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 30% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 35% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 40% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 45% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 50% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 55% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz
+Approx 60% complete for GEX-R15-AS-12162022_S3_L001_R2_001.fastq.gz

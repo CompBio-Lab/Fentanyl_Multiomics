@@ -1,0 +1,9 @@
+sh cellranger.sh R15
+ERROR: Reading FASTQ directory
+	Caused by: /arc/project/st-singha53-1/rishikad/snrnaseq/fastq/R15/GEX-R15-AS-12162022_S3_L001_R1_001.fastq
+	Caused by: Not a directory (os error 20)
+/arc/project/st-singha53-1/rishikad/snrnaseq/fastq/R15/GEX-R15-AS-12162022_S3_L001_R1_001.fastq
+ERROR: Reading FASTQ directory
+	Caused by: /arc/project/st-singha53-1/rishikad/snrnaseq/fastq/R15/GEX-R15-AS-12162022_S3_L001_R2_001.fastq
+	Caused by: Not a directory (os error 20)
+/arc/project/st-singha53-1/rishikad/snrnaseq/fastq/R15/GEX-R15-AS-12162022_S3_L001_R2_001.fastq
