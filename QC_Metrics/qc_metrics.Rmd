@@ -1,0 +1,239 @@
+---
+title: "qc_metrics"
+output: html_document
+date: "2024-05-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# QC Metrics for Multiomics Data (GEX and ATAC)
+
+## Load libraries 
+```{r}
+library(dplyr)
+library(Seurat)
+library(SeuratObject)
+library(hdf5r)
+library(SeuratData)
+library(SeuratDisk)
+library(EnsDb.Rnorvegicus.v75)
+library(GenomicRanges)
+```
+
+## Load h5 files 
+```{r}
+r3counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R3.h5")
+r4counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R4.h5")
+r15counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R15.h5")
+r16counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R16.h5")
+```
+
+## Create GEX Seurat objects 
+```{r}
+r3_RNA <- CreateSeuratObject(counts = r3counts$`Gene Expression`, assay = "RNA")
+r4_RNA <- CreateSeuratObject(counts = r4counts$`Gene Expression`, assay = "RNA")
+r15_RNA <- CreateSeuratObject(counts = r15counts$`Gene Expression`, assay = "RNA")
+r16_RNA <- CreateSeuratObject(counts = r16counts$`Gene Expression`, assay = "RNA")
+Idents(r3_RNA) <- "r3"
+Idents(r4_RNA) <- "r4"
+Idents(r15_RNA) <- "r15"
+Idents(r16_RNA) <- "r16"
+
+#orig.ident needs to be re-labelled as sample name as it changes to "SeuratProject" 
+r3_RNA@meta.data$orig.ident <- factor('r3')
+r4_RNA@meta.data$orig.ident <- factor('r4')
+r15_RNA@meta.data$orig.ident <- factor('r15')
+r16_RNA@meta.data$orig.ident <- factor('r16')
+
+#Merging the Seurat objects
+RNA_merged_data <- merge(r3_RNA, y = c(r4_RNA, r15_RNA, r16_RNA), add.cell.ids = c("r3", "r4", "r15", 
+"r16"), project = "RNA")
+```
+
+
+## Quality Control: GEX dataset  
+```{r}
+# Number of nuclei in each sample before filtering 
+before_filter <- table(Idents(RNA_merged_data))
+
+# Step 1: Remove mitochondrial genes 
+keep_genes <- rownames(RNA_merged_data)[-grep("^Mt-", rownames(RNA_merged_data))]
+RNA_merged_data <- subset(RNA_merged_data, features = keep_genes)
+
+# Step 2: Visualize violin plot of nCount_RNA and nFeature_RNA 
+VlnPlot(RNA_merged_data, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+
+# Step 3: Remove cells that have less than 100 features (potential empty droplet) and more than 7500 features (potential doublet)
+RNA_merged_data <- subset(RNA_merged_data, subset = nFeature_RNA > 100 & nFeature_RNA < 7500)
+
+# Number of nuclei in each sample after filtering 
+after_filter <- table(Idents(RNA_merged_data))
+```
+
+## Load ATAC data
+```{r}
+r3counts_peaks <- r3counts$Peaks
+r4counts_peaks <- r4counts$Peaks
+r15counts_peaks <- r15counts$Peaks
+r16counts_peaks <- r16counts$Peaks
+```
+
+## Create chromatinAssay object for each sample using counts and fragment file 
+```{r}
+#Chromatin assay for R3 
+chrom_assay_R3 <- CreateChromatinAssay(
+  counts = r3counts_peaks,
+  sep = c(":", "-"),
+  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R3.tsv.gz",
+  min.cells = 10, 
+  min.features = 200
+)
+#meta-data for R3 
+metadata_R3 <- read.csv("per_barcode_metrics_R3.csv")
+
+#Chromatin assay for R4 
+chrom_assay_R4 <- CreateChromatinAssay(
+  counts = r4counts_peaks,
+  sep = c(":", "-"),
+  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R4.tsv.gz",
+  min.cells = 10, 
+  min.features = 200
+)
+
+#meta-data for R4 
+metadata_R4 <- read.csv("per_barcode_metrics_R4.csv")
+
+#chromatin assay for R15 
+chrom_assay_R15 <- CreateChromatinAssay(
+  counts = r15counts_peaks,
+  sep = c(":", "-"),
+  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R15.tsv.gz",
+  min.cells = 10, 
+  min.features = 200
+)
+
+#meta-data for R15 
+metadata_R15 <- read.csv("per_barcode_metrics_R15.csv")
+
+#chromatin assay for R16 
+chrom_assay_R16 <- CreateChromatinAssay(
+  counts = r16counts_peaks,
+  sep = c(":", "-"),
+  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R16.tsv.gz",
+  min.cells = 10, 
+  min.features = 200
+)
+
+#meta-data for R16 
+metadata_R16 <- read.csv("per_barcode_metrics_R16.csv")
+```
+
+## Create seurat objects for each sample 
+```{r}
+R3_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R3,
+  meta.data = metadata_R3,
+  assay = "ATAC"
+)
+
+R4_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R4,
+  meta.data = metadata_R4,
+  assay = "ATAC"
+)
+
+R15_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R15,
+  meta.data = metadata_R15,
+  assay = "ATAC"
+)
+
+R16_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R16,
+  meta.data = metadata_R16,
+  assay = "ATAC"
+)
+
+
+# orig.ident in meta-data and active.ident needs to be re-labelled from "SeuratProject" to sample name
+R3_seur_peaks@meta.data$orig.ident <- factor("r3")
+R4_seur_peaks@meta.data$orig.ident <- factor("r4")
+R15_seur_peaks@meta.data$orig.ident <- factor("r15")
+R16_seur_peaks@meta.data$orig.ident <- factor("r16")
+
+levels(R3_seur_peaks@active.ident) <- "r3"
+levels(R4_seur_peaks@active.ident) <- "r4"
+levels(R15_seur_peaks@active.ident) <- "r15"
+levels(R16_seur_peaks@active.ident) <- "r16"
+```
+
+## Merge all the seurat objects (peaks) from each sample into one object 
+```{r}
+atac <- merge(
+  x = R3_seur_peaks,
+  y = c(R4_seur_peaks, R15_seur_peaks, R16_seur_peaks), add.cell.ids = c("r3", "r4", "r15", 
+"r16")
+)
+```
+
+## Adding gene annotations 
+```{r}
+# Extract gene annotations from EnsDB (Rnorvegicus)
+
+annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Rnorvegicus.v75)
+
+
+# Add gene information to the object 
+Annotation(atac) <- annotation
+```
+
+## Quality Control: ATAC dataset 
+```{r}
+# Number of nuclei in each sample before filtering 
+before_filter_atac <- table(Idents(atac))
+
+# Step 1: Compute quality control metrics (nucleosome signal and TSS enrichment score)
+atac <- NucleosomeSignal(atac)
+atac <- TSSEnrichment(object = atac)
+
+# Step 2: Visualize QC metrics through violin plots 
+a1 <- DensityScatter(atac, x = 'nCount_ATAC', y = 'TSS.enrichment', log_x = TRUE, quantiles = TRUE)
+a2 <- DensityScatter(atac, x = 'nucleosome_signal', y = 'TSS.enrichment', log_x = TRUE, quantiles = TRUE)
+
+a1 | a2
+
+VlnPlot(object = atac, 
+        features = c('nCount_ATAC', 'nFeature_ATAC', 'TSS.enrichment', 'nucleosome_signal'), 
+        pt.size = 0.1, 
+        ncol = 4)
+
+# Step 3: Remove poor quality cells (cells with low TSS enrichment score, fragments bound around nucleosomes)
+atac <- subset(
+  x = atac,
+  subset = nCount_ATAC > 100 &
+    nCount_ATAC < 400000 &
+    nucleosome_signal < 5 &
+    TSS.enrichment > 0.5
+)
+
+# Number of nuclei in each sample before filtering 
+after_filter_atac <- table(Idents(atac))
+
+```
+
+## Find the common cells (barcodes) between two datasets 
+```{r}
+# Extract cell barcodes from RNA and ATAC seurat objects 
+rna_barcodes <- colnames(RNA_merged_data)
+atac_barcodes <- colnames(atac) 
+
+# Find common cell barcodes 
+common_barcodes <- intersect(rna_barcodes, atac_barcodes)
+
+# Save list of common barcodes as an RDS
+saveRDS(common_barcodes, file = "common_barcodes.rds")
+```
+
