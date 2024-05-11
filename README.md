@@ -1,5 +1,7 @@
 # Single Cell Multiomics Analysis on Rat Brain following Fentanyl Self-Administration 
 
+![Method Overview](Images/method_overview.png)
+
 ## Introduction 
 This repository includes SnRNAseq and SnATACseq analysis pipeline on the rat midbrain after fentanyl self-administration. This includes the data processing (fastqc, cellranger) and the following downstream analysis: 
 * QC metrics 
