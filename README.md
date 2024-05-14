@@ -13,7 +13,7 @@ This repository includes SnRNAseq and SnATACseq analysis pipeline on the rat mid
 * Spatial data analysis for validation (CosMx) 
 
 ## Reproducibility 
-In order to reproduce our analysis, we have created docker images for certain steps (fastqc, cellranger-arc, scCODA, and MultiVI). Follow the steps below to build the docker image locally or through UBC ARC Sockeye. 
+In order to reproduce our analysis, we have created docker images for certain steps (fastqc, cellranger-arc, scCODA, and MultiVI). The Docker and Makefiles can be found in the Data_Processing folder. Follow the steps below to build the docker image locally or through UBC ARC Sockeye. 
 
 ### Local 
 - create docker image and run container
@@ -41,7 +41,7 @@ make push
 
 ```bash
 module load git
-git clone https://github.com/rishikadaswani/snrnaseq
+git clone https://github.com/CompBio-Lab/Fentanyl_Multiomics.git
 ```
 
 #### pull docker image
