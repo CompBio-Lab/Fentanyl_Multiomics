@@ -1,0 +1,267 @@
+---
+title: "MultiVI.Rmd"
+output: html_document
+date: "2024-04-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# MultiVI (Integrating GEX and ATAC datasets)
+
+# Load libraries 
+```{python}
+import pandas as pd
+import tempfile
+import anndata as ad
+import matplotlib.pyplot as plt
+import mudata as md
+import muon
+import scanpy as sc
+import scvi
+import seaborn as sns
+import torch
+import numpy as np
+import igraph
+```
+
+## MultiVI starting with individual h5 files 
+
+# Load multiomics data 
+```{python}
+#R3
+adata_r3 = scvi.data.read_10x_multiome("filtered_feature_bc_matrix_R3")
+adata_r3.var_names_make_unique()
+
+#R4
+adata_r4 = scvi.data.read_10x_multiome("filtered_feature_bc_matrix_R4")
+adata_r4.var_names_make_unique()
+
+#R15
+adata_r15 = scvi.data.read_10x_multiome("filtered_feature_bc_matrix_R15")
+adata_r15.var_names_make_unique()
+
+#R16 
+adata_r16 = scvi.data.read_10x_multiome("filtered_feature_bc_matrix_R16")
+adata_r16.var_names_make_unique()
+```
+
+# Identifying pattern of indexes (genes vs regions)
+```{python}
+# R15
+
+import re
+# Define the pattern to match
+pattern = r'^[A-Za-z0-9]+.*:\d+-\d+$'
+
+# Find the index where the pattern first occurs
+first_pattern_index = None
+for i, idx in enumerate(adata_r15.var.index):
+    if re.match(pattern, idx):
+        first_pattern_index = i
+        break
+
+# Print the index where the pattern first occurs
+if first_pattern_index is not None:
+    print("Index where the pattern first occurs:", first_pattern_index)
+else:
+    print("Pattern not found in the index.")
+```
+
+```{python}
+# R3
+
+import re
+# Define the pattern to match
+pattern = r'^[A-Za-z0-9]+.*:\d+-\d+$'
+
+# Find the index where the pattern first occurs
+first_pattern_index = None
+for i, idx in enumerate(adata_r3.var.index):
+    if re.match(pattern, idx):
+        first_pattern_index = i
+        break
+
+# Print the index where the pattern first occurs
+if first_pattern_index is not None:
+    print("Index where the pattern first occurs:", first_pattern_index)
+else:
+    print("Pattern not found in the index.")
+```
+
+# Adding modality into inidvidual adata's 
+```{python}
+adata_r15.var['modality'][:23140] = 'Gene Expression'
+adata_r15.var['modality'][23141:116154] = "Peaks"
+
+```
+
+```{python}
+adata_r3.var['modality'][:23140] = 'Gene Expression'
+adata_r3.var['modality'][23141:132546] = "Peaks"
+```
+
+```{python}
+adata_r4.var['modality'][:23140] = 'Gene Expression'
+adata_r4.var['modality'][23141:82064] = 'Peaks'
+```
+
+```{python}
+adata_r16.var['modality'][:23140] = 'Gene Expression' 
+adata_r16.var['modality'][23141:100165] = 'Peaks'
+```
+
+# Add sample IDs before cell barcodes for each sample 
+```{python}
+# Loop through row indices and prepend 'r3_' to each barcode
+for i in range(len(adata_r3.obs.index)):
+    adata_r3.obs.index.values[i] = 'r3_' + adata_r3.obs.index.values[i]
+
+for i in range(len(adata_r4.obs.index)):
+    adata_r4.obs.index.values[i] = 'r4_' + adata_r4.obs.index.values[i]
+    
+for i in range(len(adata_r15.obs.index)):
+    adata_r15.obs.index.values[i] = 'r15_' + adata_r15.obs.index.values[i]
+    
+for i in range(len(adata_r16.obs.index)):
+    adata_r16.obs.index.values[i] = 'r16_' + adata_r16.obs.index.values[i]
+```
+
+# Organize four samples into one multiome dataset. 
+## This function sorts and orders the data from the multi-modal and modality-specific AnnDatas into a single AnnData (aligning the features, padding missing modalities with 0s, etc).
+
+```{python}
+adata_r15_r16 = scvi.data.organize_multiome_anndatas(adata_r15, adata_r16) 
+adata_r3_r4 = scvi.data.organize_multiome_anndatas(adata_r3, adata_r4)
+adata_mvi = scvi.data.organize_multiome_anndatas(adata_r15_r16, adata_r3_r4)
+```
+
+```{python}
+adata_mvi = adata_mvi[:, adata_mvi.var["modality"].argsort()].copy()
+adata_mvi.var
+```
+
+
+# Only keep the common barcodes from qc step 
+```{python}
+# Load the common barcodes from GEX + ATAC qc filtering 
+common_barcodes = pd.read_csv('common_barcodes.csv')
+
+# Convert the common_barcodes DataFrame to a list
+common_barcodes_list = common_barcodes.squeeze().tolist()
+
+# Extract the barcodes from the 'x' column and preprocess them
+common_barcodes = common_barcodes['x'].str.split('-', n=1).str[0]
+
+# Extract the prefix before the second underscore from the barcodes in adata_mvi and preprocess them
+adata_mvi_barcodes = adata_mvi.obs.index.str.split('_').str[:2].str.join('_')
+
+# Filter the rows of adata_mvi based on whether their barcodes are in the common_barcodes list
+adata_mvi_filtered = adata_mvi[adata_mvi_barcodes.isin(common_barcodes)]
+
+```
+
+
+# Filtering and Quality Control 
+```{python}
+## SHOULD I DO THIS STEP? 
+print(adata_mvi_filtered.shape)
+sc.pp.filter_genes(adata_mvi_filtered, min_cells=int(adata_mvi_filtered.shape[0] * 0.01))
+print(adata_mvi_filtered.shape)
+```
+
+```{python}
+# Remove mitochondrial genes 
+mito_genes = [name for name in adata_mvi_filtered.var_names if name.startswith('Mt-')]
+adata_mvi_filtered = adata_mvi_filtered[:, ~adata_mvi_filtered.var_names.isin(mito_genes)].copy()
+print(adata_mvi_filtered.shape)
+
+```
+
+```{python}
+scvi.model.MULTIVI.setup_anndata(adata_mvi_filtered, batch_key="modality")
+```
+
+```{python}
+model = scvi.model.MULTIVI(
+    adata_mvi_filtered,
+    n_genes=(adata_mvi_filtered.var["modality"] == "Gene Expression").sum(),
+    n_regions=(adata_mvi_filtered.var["modality"] == "Peaks").sum(),
+)
+model.view_anndata_setup()
+```
+
+```{python}
+model.train()
+```
+
+```{python}
+MULTIVI_LATENT_KEY = "X_multivi"
+
+adata_mvi_filtered.obsm[MULTIVI_LATENT_KEY] = model.get_latent_representation()
+sc.pp.neighbors(adata_mvi_filtered, use_rep=MULTIVI_LATENT_KEY)
+sc.tl.umap(adata_mvi_filtered, min_dist=0.2)
+sc.pl.umap(adata_mvi_filtered, color="modality")
+```
+
+
+# Nearest neighbors 
+
+```{python}
+# compute the neighborhood graph of cells using the PCA representation of the data matrix
+
+# saving PCA array matrix as an anndata 
+adata_clust = ad.AnnData(adata_mvi_filtered.obsm[MULTIVI_LATENT_KEY])
+
+# Finding neighbors
+sc.pp.neighbors(adata_clust, n_neighbors = 20, n_pcs = 13)
+```
+
+```{python}
+# Using the igraph implementation and a fixed number of iterations can be significantly faster, especially for larger datasets
+sc.tl.leiden(adata_clust, flavor = "igraph", n_iterations=2, resolution = 0.5)
+
+sc.tl.umap(adata_clust, min_dist =0.5)
+
+sc.pl.umap(adata_clust, color=["leiden"], legend_loc='on data')
+```
+
+```{python}
+# Extract the leiden dataframe in obs as this needs to be inputted into orignial seurat object that has all the other information within it 
+
+leiden_column = adata_clust.obs['leiden']
+
+# Convert the Series to DataFrame
+leiden_df = pd.DataFrame(leiden_column)
+
+# Save as a csv file 
+leiden_df.to_csv("leiden_column_new.csv", index=False)
+
+```
+
+## Anotate cell clusters with labels from fgsea (done in R)
+```{python}
+# Load cluster_annotations csv 
+cluster_annotations = pd.read_csv('cluster_annotations.csv')
+
+# Rename clusters in adata_clust 
+new_cluster_names = ["Ex_Fezf2_Fbln1", "Chol_Isl2_Gata6_4", "Ex_Fezf2_Fibcd1_Fos_Tnn", "Inh_Six3_Cela1_1", 
+  "Ex_Evx2_Lmcd1_3", "Ex_Dmrta2_Prkcq_4", "Ex_Ebf2_Prox1_Pou4f3", "Fibro_Eya2_Slc47a1_2", "Ex_Lhx9_Tyrp1_4", 
+  "Ex_Evx2_Lmcd1_2", "Ex_Lhx9_Tyrp1_4_1", "Ex_C1ql4_Asb4", "Ex_Ebf2_Pla2g5_12", "Chol_Tbx20_S100a11_8", 
+  "Inh_Nkx2-2_Glp1r_Trh_1"]
+
+  
+adata_clust.obs['leiden'] = adata_clust.obs['leiden'].cat.rename_categories(new_cluster_names)
+
+```
+
+# Plot UMAP and save image 
+
+```{python}
+sc.pl.umap(
+    adata_clust, color="leiden", legend_loc="on data", legend_fontsize = 'small', title="Clustering for GEX and ATAC Data")
+    
+plt.savefig('GEX+ATAC_Umap.png')
+```
+

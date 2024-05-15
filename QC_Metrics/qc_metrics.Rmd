@@ -235,5 +235,20 @@ common_barcodes <- intersect(rna_barcodes, atac_barcodes)
 
 # Save list of common barcodes as an RDS
 saveRDS(common_barcodes, file = "common_barcodes.rds")
+write.csv(common_barcodes, file = "common_barcodes.csv", row.names = FALSE)
 ```
+
+## Subset RNA seurat object with common cellbarcodes
+```{r}
+# Add cell barcodes to meta data 
+RNA_merged_data <- AddMetaData(RNA_merged_data, colnames(RNA_merged_data), col.name = 'barcodes')
+
+# Subset RNA seurat object 
+RNA_subset <- subset(RNA_merged_data, barcodes %in% common_barcodes)
+
+# Save seurat object for further analysis 
+SaveRDS(RNA_subset, file = "RNA_subset.rds")
+```
+
+
 

@@ -1,0 +1,142 @@
+---
+title: "seurat_clustering.Rmd"
+output: html_document
+date: "2024-05-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Seurat Clustering of GEX data 
+
+## Load Libraries
+```{r}
+library(dplyr)
+library(Seurat)
+library(SeuratObject)
+library(hdf5r)
+library(ggplot2)
+library(tidyr)
+library(fgsea)
+library(SeuratData)
+library(SeuratDisk)
+```
+
+
+## Load Data 
+```{r}
+# Load rds from QC metrics step 
+RNA <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/RNA_subset.rds")
+```
+
+## Normalizing the data 
+```{r}
+#Normalizing the Data 
+RNA <- NormalizeData(RNA, normalization.method = "LogNormalize", scale.factor = 
+10000)
+```
+
+## Identification of highly variable features 
+```{r}
+RNA <- FindVariableFeatures(RNA, selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(RNA), 10)
+plot1 <- VariableFeaturePlot(RNA)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+```
+
+## Variance stablization and transformation 
+```{r}
+RNA <- SCTransform(RNA)
+```
+
+## Performing linear dimensional reduction 
+```{r}
+#Performing PCA on the scaled dataset 
+RNA <- RunPCA(RNA)
+
+VizDimLoadings(RNA, dims = 1:2, reduction = "pca")
+DimPlot(RNA, reduction = "pca")
+
+# Determine dimensionality of the dataset 
+ElbowPlot(RNA)
+```
+
+## Cluster the cells 
+```{r}
+RNA <- FindNeighbors(RNA, dims = 1:11)
+RNA <- FindClusters(RNA, resolution = 0.1)
+
+```
+
+## Run non-linear dimensional reduction (UMAP)
+```{r}
+#(reticulate::py_install(packages = 'umap-learn')
+set.seed(10)
+RNA <- RunUMAP(RNA, dims = 1:11)
+DimPlot(RNA, reduction = "umap", label = FALSE)
+#Cluster by sample 
+DimPlot(RNA, reduction = "umap", group.by = "orig.ident")
+```
+
+## Manual annotation 
+```{r}
+
+#Now let's extract the top marker genes, and see which ones correspond with each cluster. This can be done using the FindAllMarkers function within Seurat.
+
+RNA <- PrepSCTFindMarkers(object = RNA, assay = "SCT")
+cluster_markers <- FindAllMarkers(RNA) # finds which genes are different 
+```
+
+## Add data (clusters) from MultiVI (GEX + ATAC) into seurat object 
+```{r}
+#read in csv 
+leiden_data <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/leiden_column_new.csv")
+
+#convert to factor class 
+leiden_data_factor <- factor(leiden_data$leiden)
+
+# replace "seurat_clusters" in metadata with leiden_data 
+RNA@meta.data$seurat_clusters <- leiden_data_factor
+
+
+# replace Idents in metadata with leiden_data 
+leiden_column <- leiden_data$leiden
+Idents(RNA) <- leiden_column
+```
+
+# Find Cluster Markers 
+```{r}
+cluster_markers <- FindAllMarkers(RNA)
+```
+
+## Fast Gene Set Enrichement Analysis 
+```{r}
+
+mouse_brain <- read.csv("~/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/biorxiv_mouse_brain.csv")
+mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
+  i[-grep("ENS", i)]
+})
+names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
+mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
+
+fc <- cluster_markers$avg_log2FC
+names(fc) <- rownames(cluster_markers)
+fc_cl <- split(fc, cluster_markers$cluster)
+
+ 
+
+cluster_annotations <- lapply(fc_cl, function(i){
+  res <- fgsea(mbrain_genesets, i)
+  res <- res[order(res$pval),]
+  res$pathway[1]
+})
+```
+
+## Save cluster_annotations to add back into adata object for MultiVI 
+```{r}
+
+```
+
