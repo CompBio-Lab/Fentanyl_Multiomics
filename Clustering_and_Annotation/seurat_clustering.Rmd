@@ -135,8 +135,21 @@ cluster_annotations <- lapply(fc_cl, function(i){
 })
 ```
 
+## Order cluster_annotations
+```{r}
+# Order the list indices sequentially
+ordered_indices <- order(as.numeric(names(cluster_annotations)))
+
+# Reorder the list using the ordered indices
+cluster_annotations <- cluster_annotations[ordered_indices]
+
+# Rename the list elements to match the new order
+names(cluster_annotations) <- 0:(length(cluster_annotations) - 1)
+```
+
 ## Save cluster_annotations to add back into adata object for MultiVI 
 ```{r}
+write.csv(as.data.frame(cluster_annotations), "cluster_annotations.csv", row.names = FALSE)
 
 ```
 

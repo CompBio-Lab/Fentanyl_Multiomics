@@ -247,7 +247,7 @@ RNA_merged_data <- AddMetaData(RNA_merged_data, colnames(RNA_merged_data), col.n
 RNA_subset <- subset(RNA_merged_data, barcodes %in% common_barcodes)
 
 # Save seurat object for further analysis 
-SaveRDS(RNA_subset, file = "RNA_subset.rds")
+saveRDS(RNA_subset, file = "RNA_subset.rds")
 ```
 
 
