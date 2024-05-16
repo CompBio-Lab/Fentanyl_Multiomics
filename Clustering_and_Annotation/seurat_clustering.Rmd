@@ -8,7 +8,7 @@ date: "2024-05-15"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Seurat Clustering of GEX data 
+# Seurat Clustering of GEX data and MultiVI (GEX + ATAC) pre-processing 
 
 ## Load Libraries
 ```{r}
@@ -90,6 +90,38 @@ RNA <- PrepSCTFindMarkers(object = RNA, assay = "SCT")
 cluster_markers <- FindAllMarkers(RNA) # finds which genes are different 
 ```
 
+## Fast gene set enrichment analysis (fgsea) for only GEX data 
+```{r}
+mouse_brain <- read.csv("~/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/biorxiv_mouse_brain.csv")
+mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
+  i[-grep("ENS", i)]
+})
+names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
+mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
+
+fc <- cluster_markers$avg_log2FC
+names(fc) <- rownames(cluster_markers)
+fc_cl <- split(fc, cluster_markers$cluster)
+
+cluster_annotations <- lapply(fc_cl, function(i){
+  res <- fgsea(mbrain_genesets, i)
+  res <- res[order(res$pval),]
+  res$pathway[1]
+})
+```
+
+## Labelling clusters with cell type 
+```{r}
+RNA <- RenameIdents(RNA, cluster_annotations)
+DimPlot(RNA, reduction = 'umap')
+```
+
+## Save GEX seurat object
+```{r}
+saveRDS(RNA, file = 'GEX_seur.rds')
+```
+
+
 ## Add data (clusters) from MultiVI (GEX + ATAC) into seurat object 
 ```{r}
 #read in csv 
@@ -107,12 +139,12 @@ leiden_column <- leiden_data$leiden
 Idents(RNA) <- leiden_column
 ```
 
-# Find Cluster Markers 
+## Find Cluster Markers 
 ```{r}
 cluster_markers <- FindAllMarkers(RNA)
 ```
 
-## Fast Gene Set Enrichement Analysis 
+## Fast Gene Set Enrichement Analysis (GEX + ATAC)
 ```{r}
 
 mouse_brain <- read.csv("~/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/biorxiv_mouse_brain.csv")
@@ -147,9 +179,18 @@ cluster_annotations <- cluster_annotations[ordered_indices]
 names(cluster_annotations) <- 0:(length(cluster_annotations) - 1)
 ```
 
+# Labelling clusters with cell type 
+```{r}
+RNA <- RenameIdents(RNA, cluster_annotations)
+```
+
 ## Save cluster_annotations to add back into adata object for MultiVI 
 ```{r}
 write.csv(as.data.frame(cluster_annotations), "cluster_annotations.csv", row.names = FALSE)
+```
 
+## Save GEX+ATAC seurat object 
+```{r}
+saveRDS(RNA, file = 'GEX_ATAC_Seur.rds')
 ```
 

@@ -1,0 +1,59 @@
+---
+title: "scCODA.Rmd"
+output: html_document
+date: "2024-05-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# scCODA: Compositional Analysis of Single-Cell Data (Pre-processing)
+
+# Load libraries 
+```{r}
+library(dplyr)
+library(Seurat)
+library(SeuratObject)
+library(hdf5r)
+library(ggplot2)
+library(tidyr)
+library(fgsea)
+library(SeuratData)
+library(SeuratDisk)
+```
+
+# Load in data (seurat object)
+```{r}
+GEX_ATAC_seur <- readRDS("/Users/rishikadaswani/Desktop/rds/GEX_ATAC_Seur.rds")
+```
+
+# Add meta data to run scCODA analysis
+```{r}
+demo_10x <- data_frame(ids = c("r3", "r4", "r15", "r16"),
+                       condition = c("saline", "fentanyl", "fentanyl", "saline"), 
+                       sex = c("Male", "Male", "Female", "Female"))
+
+GEX_ATAC_seur@meta.data <- left_join(GEX_ATAC_seur@meta.data, demo_10x, by = c("orig.ident" = "ids"))
+
+# Create a column in metadata called SampleID with same info as orig.ident 
+GEX_ATAC_seur@meta.data$SampleID <- GEX_ATAC_seur@meta.data$orig.ident
+
+# Create a column in metadata called cell_type with cell types in cluster_annotations (csv can be found in clustering_and_annotation folder) 
+
+cell_types <- c("Ex_Fezf2_Fbln1", "Chol_Isl2_Gata6_4", "Ex_Fezf2_Fibcd1_Fos_Tnn", "Inh_Six3_Cela1_1", 
+  "Ex_Evx2_Lmcd1_3", "Ex_Dmrta2_Prkcq_4", "Ex_Ebf2_Prox1_Pou4f3", "Fibro_Eya2_Slc47a1_2", "Ex_Lhx9_Tyrp1_4", 
+  "Ex_Evx2_Lmcd1_2", "Ex_Lhx9_Tyrp1_4_1", "Ex_C1ql4_Asb4", "Ex_Ebf2_Pla2g5_12", "Chol_Tbx20_S100a11_8", 
+  "Inh_Nkx2-2_Glp1r_Trh_1")
+
+GEX_ATAC_seur@meta.data$cell_type <- NA
+GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, levels = cell_types)
+```
+
+# Save seurat object as h5ad for sccoda analysis in python 
+```{r}
+# Save object as h5ad for input into sccoda 
+SaveH5Seurat(GEX_ATAC_seur, filename = "GEX_ATAC_scCODA.h5Seurat")
+Convert("GEX_ATAC_scCODA.h5Seurat", dest = "h5ad")
+```
+
