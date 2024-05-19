@@ -21,7 +21,7 @@ library(future)
 
 ## Load data 
 ```{r}
-seurat_object <- readRDS("/Users/rishikadaswani/Desktop/rds/GEX_ATAC_Seur.rds")
+seurat_obj <- readRDS("/Users/rishikadaswani/Desktop/rds/GEX_ATAC_Seur.rds")
 ```
 
 ## Add meta data 
@@ -36,7 +36,7 @@ seurat_obj <- AddMetaData(
 )
 
 # Add condition to meta-data
-drug = rep(c("Saline", "Fentanyl", "Fentanyl", "Saline"), c(4900, 473, 2659, 1384))
+drug = rep(c("Saline", "Fentanyl", "Fentanyl", "Saline"), c(4567, 444, 2466, 1284))
 names(drug) <- colnames(x = seurat_obj)
 seurat_obj <- AddMetaData(
   object = seurat_obj,
@@ -45,6 +45,11 @@ seurat_obj <- AddMetaData(
 
 
 plan(sequential)
+```
+
+## JoinLayers function to join the layers within the seurat object 
+```{r}
+seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
 ```
 
 ## Run differential analysis with default parameters 
@@ -69,7 +74,7 @@ CCI_detected <- GetTableCCI(scdiffcom_object, type = "detected", simplified = TR
 # Number of CCIs per regulation type (here with age)
 table(CCI_detected$REGULATION)
 ## DOWN  FLAT   NSC    UP 
-  # 12 10960  2262    74 
+  # 134   132  70      4 
 
 
 # Retrieve the ORA results
@@ -108,7 +113,7 @@ ggplot(
 PlotORA(
   object = scdiffcom_object,
   category = "LRI",
-  regulation = "DOWN"
+  regulation = "UP"
 ) + theme(
   legend.position = c(0.85, 0.4),
   legend.key.size = unit(0.4, "cm")

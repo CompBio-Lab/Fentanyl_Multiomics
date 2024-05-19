@@ -76,12 +76,37 @@ top <- lapply(names(table(cell_labels)), function(cell){
 top }) 
 ```
 
+## Limma analysis (DupCor) with one cell type 
+```{r}
+cell = names(table(cell_labels))[1]
+keep <- cell_labels %in% cell
+  counts <- eset[, keep]
+  dat <- data.frame(sex = sex[keep],
+                    drug = drug[keep],
+                    subj = gsub("_.*", "", colnames(counts)))
+  
+  design <- model.matrix(~sex*drug, data = dat)
+  vobj_tmp <- voom(counts, design, plot = FALSE)
+  dupcor <- duplicateCorrelation(vobj_tmp, design, block = dat$subj)
+  vobj <- voom(counts, design, plot = FALSE, block = dat$subj, correlation = dupcor$consensus)
+  dupcor <- duplicateCorrelation(vobj, design, block = dat$subj)
+  fitDupCor <- lmFit(vobj, design, block = dat$subj, correlation = dupcor$consensus)
+  fitDupCor <- eBayes(fitDupCor)
+  top_FvsM <- topTable(fitDupCor, coef = "sexFemale", adjust.method = "BH", number = nrow(fitDupCor))
+  top_FvsM$comparison <- "Female_vs_Male"
+  top_FvsM$gene <- rownames(top_FvsM)
+  top_SvsF <- topTable(fitDupCor, coef = "drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
+  top_SvsF$comparison <- "Saline_vs_Fentanyl"
+  top_SvsF$gene <- rownames(top_SvsF)
+  top_int <- topTable(fitDupCor, coef = "sexFemale:drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
+  top_int$comparison <- "drug x sex interaction"
+  top_int$gene <- rownames(top_int)
+  top <- rbind(top_FvsM, top_SvsF, top_int)
+  top$cell <- cell
+```
 
-
-
-%>% 
-  do.call(rbind, .)
-#Filter by p-value and plot 
+## Plot DEGs for the above cell type 
+```{r}
 top %>% filter(adj.P.Val < 0.001) %>% 
   group_by(cell, comparison) %>% 
   summarise(n = n()) %>% 
@@ -96,93 +121,11 @@ top %>% filter(adj.P.Val < 0.001) %>%
   theme(legend.position = c(0.9,0.9)) + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-
-top %>% 
-  group_by(cell, comparison) %>% 
-  arrange(adj.P.Val) %>% 
-  mutate(n = 1:n()) %>% 
-  ggplot(aes(x = n, y = adj.P.Val, col= cell)) +
-  geom_line() +
-  facet_wrap(~comparison) 
-  
-```
-
-
-```{r}
-
-# Define the function to process each cell type
-process_cell <- function(cell) {
-  keep <- cell_labels %in% cell
-  counts <- eset[, keep]
-  dat <- data.frame(
-    sex = sex[keep],
-    drug = drug[keep],
-    subj = gsub("_.*", "", colnames(counts))
-  )
-  
-  design <- model.matrix(~sex * drug, data = dat)
-  vobj_tmp <- voom(counts, design, plot = FALSE)
-  dupcor <- duplicateCorrelation(vobj_tmp, design, block = dat$subj)
-  vobj <- voom(counts, design, plot = FALSE, block = dat$subj, correlation = dupcor$consensus)
-  dupcor <- duplicateCorrelation(vobj, design, block = dat$subj)
-  fitDupCor <- lmFit(vobj, design, block = dat$subj, correlation = dupcor$consensus)
-  fitDupCor <- eBayes(fitDupCor)
-  
-  top_FvsM <- topTable(fitDupCor, coef = "sexFemale", adjust.method = "BH", number = nrow(fitDupCor))
-  top_FvsM$comparison <- "Female_vs_Male"
-  top_FvsM$gene <- rownames(top_FvsM)
-  
-  top_SvsF <- topTable(fitDupCor, coef = "drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
-  top_SvsF$comparison <- "Saline_vs_Fentanyl"
-  top_SvsF$gene <- rownames(top_SvsF)
-  
-  top_int <- topTable(fitDupCor, coef = "sexFemale:drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
-  top_int$comparison <- "drug x sex interaction"
-  top_int$gene <- rownames(top_int)
-  
-  top_combined <- rbind(top_FvsM, top_SvsF, top_int)
-  top_combined$cell <- cell
-  
-  return(top_combined)
-}
-
-# Set up parallel processing
-plan(multisession)  # Use multicore processing
-# You can also use plan(multiprocess) for automatic selection of the best available backend
-
-# Apply the function to each cell type in parallel
-cell_types <- names(table(cell_labels))
-top_list <- future_lapply(cell_types, process_cell)
-
-# Combine all results into a single data frame using data.table::rbindlist
-top <- data.table::rbindlist(top_list)
-
-# Filter by p-value and plot
 top_filtered <- top %>% filter(adj.P.Val < 0.001)
-
-top_summary <- top_filtered %>%
-  group_by(cell, comparison) %>%
-  summarise(n = n()) %>%
-  ungroup() %>%
-  complete(cell, comparison) %>%
-  mutate(comparison = factor(comparison, levels = c("drug x sex interaction", "Female_vs_Male", "Saline_vs_Fentanyl")))
-
-ggplot(top_summary, aes(x = reorder(cell, -n), y = n, fill = comparison)) + 
-  geom_bar(stat = "identity", position = "dodge") + 
-  scale_y_log10() + 
-  ylab("Number of differentially expressed genes (FDR<1%)") +   
-  xlab("Cell-type") +   
-  theme_classic() +   
-  theme(legend.position = c(0.9, 0.9)) + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-
-top %>% 
-  group_by(cell, comparison) %>% 
-  arrange(adj.P.Val) %>% 
-  mutate(n = 1:n()) %>% 
-  ggplot(aes(x = n, y = adj.P.Val, col = cell)) +
-  geom_line() +
-  facet_wrap(~comparison)
-
+top_filtered_dxs <- top_filtered[top_filtered$comparison == "drug x sex interaction", ]
 ```
+
+
+
+
 
