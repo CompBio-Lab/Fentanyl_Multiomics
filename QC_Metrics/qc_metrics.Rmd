@@ -21,6 +21,7 @@ library(SeuratData)
 library(SeuratDisk)
 library(EnsDb.Rnorvegicus.v75)
 library(GenomicRanges)
+library(Signac)
 ```
 
 ## Load h5 files 
@@ -87,48 +88,48 @@ r16counts_peaks <- r16counts$Peaks
 chrom_assay_R3 <- CreateChromatinAssay(
   counts = r3counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R3.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R3.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 #meta-data for R3 
-metadata_R3 <- read.csv("per_barcode_metrics_R3.csv")
+metadata_R3 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R3.csv")
 
 #Chromatin assay for R4 
 chrom_assay_R4 <- CreateChromatinAssay(
   counts = r4counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R4.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R4.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 
 #meta-data for R4 
-metadata_R4 <- read.csv("per_barcode_metrics_R4.csv")
+metadata_R4 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R4.csv")
 
 #chromatin assay for R15 
 chrom_assay_R15 <- CreateChromatinAssay(
   counts = r15counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R15.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R15.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 
 #meta-data for R15 
-metadata_R15 <- read.csv("per_barcode_metrics_R15.csv")
+metadata_R15 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R15.csv")
 
 #chromatin assay for R16 
 chrom_assay_R16 <- CreateChromatinAssay(
   counts = r16counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/snatacseq/atac_fragments/atac_fragments_R16.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R16.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 
 #meta-data for R16 
-metadata_R16 <- read.csv("per_barcode_metrics_R16.csv")
+metadata_R16 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R16.csv")
 ```
 
 ## Create seurat objects for each sample 

@@ -1,0 +1,12 @@
+# R related files 
+.DS_Store
+.Rhistory
+.Rproj.user
+.RData
+
+# ignore rds directory which contains rds, h5ad and H5Seurat files 
+rds/
+
+# ignore atac_fragments directory which contains .tsv fragment files and .csv metadata files 
+/QC_Metrics/atac_fragments/
+
