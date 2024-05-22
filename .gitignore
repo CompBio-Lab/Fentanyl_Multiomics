@@ -3,10 +3,9 @@
 .Rhistory
 .Rproj.user
 .RData
+.Rproj
 
-# ignore rds directory which contains rds, h5ad and H5Seurat files 
-rds/
+# ignore data directory which contains rds, h5ad and H5Seurat files 
+Data/
 
-# ignore atac_fragments directory which contains .tsv fragment files and .csv metadata files 
-/QC_Metrics/atac_fragments/
 

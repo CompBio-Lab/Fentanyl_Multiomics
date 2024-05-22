@@ -54,7 +54,7 @@ data <- AddMetaData(data, metadata = replicates, col.name = "replicate")
 
 ## Run `run_de` , and inspect the differential expression 
 ```{r}
-DE = run_de(data, meta = meta, cell_type_col = "cell_type", label_col = "drug", de_family = "mixedmodel", de_method = "linear")
+DE = run_de(data, cell_type_col = "cell_type", label_col = "drug", de_family = "mixedmodel", de_method = "linear")
 head(DE)
 ```
 

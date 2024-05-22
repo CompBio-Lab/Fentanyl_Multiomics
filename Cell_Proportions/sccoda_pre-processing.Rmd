@@ -53,7 +53,7 @@ GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, l
 # Save seurat object as h5ad for sccoda analysis in python 
 ```{r}
 # Save object as h5ad for input into sccoda 
-SaveH5Seurat(GEX_ATAC_seur, filename = "GEX_ATAC_scCODA.h5Seurat")
+SaveH5Seurat(GEX_ATAC_seur, filename = here::here("Data", "GEX_ATAC_scCODA.h5Seurat"))
 Convert("GEX_ATAC_scCODA.h5Seurat", dest = "h5ad")
 ```
 

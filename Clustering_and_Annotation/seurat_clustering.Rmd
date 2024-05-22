@@ -118,7 +118,7 @@ DimPlot(RNA, reduction = 'umap')
 
 ## Save GEX seurat object
 ```{r}
-saveRDS(RNA, file = 'GEX_seur.rds')
+saveRDS(RNA, file = here::here("Data", 'GEX_seur.rds'))
 ```
 
 
@@ -191,6 +191,6 @@ write.csv(as.data.frame(cluster_annotations), "cluster_annotations.csv", row.nam
 
 ## Save GEX+ATAC seurat object 
 ```{r}
-saveRDS(RNA, file = 'GEX_ATAC_Seur.rds')
+saveRDS(RNA, file = here::here("Data", 'GEX_ATAC_Seur.rds'))
 ```
 

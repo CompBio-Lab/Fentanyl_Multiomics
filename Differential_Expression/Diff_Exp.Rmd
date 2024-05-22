@@ -18,11 +18,12 @@ library(tidyr)
 library(ggplot2)
 library(EnhancedVolcano)
 library(Seurat)
+library(gridExtra)
 ```
 
 ## Load data 
 ```{r}
-rna <- readRDS("/Users/rishikadaswani/Desktop/rds/GEX_ATAC_Seur.rds")
+rna <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/rds/GEX_ATAC_Seur.rds")
 ```
 
 ## Add metadata 
@@ -32,6 +33,8 @@ demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
                        sex = c("Male", "Male", "Female", "Female"))
 demo_10x <- rna@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
 demo_10x <- demo_10x %>% left_join(demo, by = "ids")
+new_metadata <- demo_10x[, c("drug", "sex")]
+rna <- AddMetaData(object = rna, metadata = new_metadata)
 ```
 
 ## Extract counts 
@@ -43,12 +46,46 @@ drug <- factor(demo_10x[, "drug"], c("Saline", "Fentanyl"))
 cell_labels <- as.character(Idents(rna))
 ```
 
+## Frequency of nuclei in each cell type by drug and sex 
+```{r}
+cc <- lapply(names(table(cell_labels)), function(cell){
+  cat(cell, fill = TRUE)
+  keep <- cell_labels %in% cell
+  counts <- eset[1:5, keep]
+  dat <- data.frame(sex = sex[keep],
+                  drug = drug[keep],
+                  subj = gsub("_.*", "", colnames(counts)))
+  table(dat$sex, dat$drug) %>% 
+  as.data.frame() %>% 
+  mutate(cell = cell)
+}) %>% 
+  do.call(rbind, .)
+
+colnames(cc)[colnames(cc) == "Var1"] <- "sex"
+colnames(cc)[colnames(cc) == "Var2"] <- "drug"
+
+cc %>% 
+  ggplot(aes(y = cell, x = Freq, fill = sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~drug, scales = "free") + ggtitle("Frequency of Nuclei in Each Cell Type by Sex and Drug")
+
+summary(lm(Freq ~ Var1*Var2, data = cc))
+
+```
+
 ## Limma Analysis 
 ### Limma has a built-in approach for analyzing repeated measures data using duplicateCorrelation(). The model can handle a single random effect, and forces the magnitude of the random effect to be the same across all genes.
 
+## paralellized limma with DupCor 
 
 ```{r}
-top <- lapply(names(table(cell_labels)), function(cell){
+eset <- as.matrix(eset)
+library(parallel)
+cl <- makeCluster(detectCores())
+clusterExport(cl, c("cell_labels", "sex", "drug", "eset"))
+top <- parLapply(cl, names(table(cell_labels)), function(cell){
+  library(limma);
+  cat(cell, fill = TRUE)
   keep <- cell_labels %in% cell
   counts <- eset[, keep]
   dat <- data.frame(sex = sex[keep],
@@ -74,40 +111,19 @@ top <- lapply(names(table(cell_labels)), function(cell){
   top <- rbind(top_FvsM, top_SvsF, top_int)
   top$cell <- cell
 top }) 
+stopCluster(cl)
+
+top <- Reduce("rbind", top)
 ```
 
-## Limma analysis (DupCor) with one cell type 
+## Save top table 
 ```{r}
-cell = names(table(cell_labels))[1]
-keep <- cell_labels %in% cell
-  counts <- eset[, keep]
-  dat <- data.frame(sex = sex[keep],
-                    drug = drug[keep],
-                    subj = gsub("_.*", "", colnames(counts)))
-  
-  design <- model.matrix(~sex*drug, data = dat)
-  vobj_tmp <- voom(counts, design, plot = FALSE)
-  dupcor <- duplicateCorrelation(vobj_tmp, design, block = dat$subj)
-  vobj <- voom(counts, design, plot = FALSE, block = dat$subj, correlation = dupcor$consensus)
-  dupcor <- duplicateCorrelation(vobj, design, block = dat$subj)
-  fitDupCor <- lmFit(vobj, design, block = dat$subj, correlation = dupcor$consensus)
-  fitDupCor <- eBayes(fitDupCor)
-  top_FvsM <- topTable(fitDupCor, coef = "sexFemale", adjust.method = "BH", number = nrow(fitDupCor))
-  top_FvsM$comparison <- "Female_vs_Male"
-  top_FvsM$gene <- rownames(top_FvsM)
-  top_SvsF <- topTable(fitDupCor, coef = "drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
-  top_SvsF$comparison <- "Saline_vs_Fentanyl"
-  top_SvsF$gene <- rownames(top_SvsF)
-  top_int <- topTable(fitDupCor, coef = "sexFemale:drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
-  top_int$comparison <- "drug x sex interaction"
-  top_int$gene <- rownames(top_int)
-  top <- rbind(top_FvsM, top_SvsF, top_int)
-  top$cell <- cell
+saveRDS(top, file = here::here("Data", "top.rds"))
 ```
 
-## Plot DEGs for the above cell type 
+## Plot DEGs for all cell types for each interaction  
 ```{r}
-top %>% filter(adj.P.Val < 0.001) %>% 
+top %>% filter(adj.P.Val < 0.01) %>% 
   group_by(cell, comparison) %>% 
   summarise(n = n()) %>% 
   ungroup %>% 
@@ -121,11 +137,82 @@ top %>% filter(adj.P.Val < 0.001) %>%
   theme(legend.position = c(0.9,0.9)) + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-top_filtered <- top %>% filter(adj.P.Val < 0.001)
-top_filtered_dxs <- top_filtered[top_filtered$comparison == "drug x sex interaction", ]
+top %>% 
+  group_by(cell, comparison) %>% 
+  arrange(adj.P.Val) %>% 
+  mutate(n = 1:n()) %>% 
+  ggplot(aes(x = n, y = adj.P.Val, col= cell)) +
+  geom_line() +
+  facet_wrap(~comparison) 
+
 ```
 
+## Filtering top table  
+```{r}
+# filter only for the drug x sex interaction 
+top_dxs <- top[top$comparison == "drug x sex interaction", ]
+
+# filter for cell type 0 
+Chol_Isl2_Gata6_4 <- top_dxs[top_dxs$cell == "Chol_Isl2_Gata6_4", ]
 
 
+#remove mitochondrial genes 
+Chol_Isl2_Gata6_4 <- Chol_Isl2_Gata6_4 %>%
+  filter(!grepl("^Mt-", gene))
 
+# filter for cell type 1 
+Chol_Tbx20 <- top_dxs[top_dxs$cell == "Chol_Tbx20_S100a11_8", ]
+
+
+# filter for cell type 2 
+Ex_C1ql4 <- top_dxs[top_dxs$cell == "Ex_C1ql4_Asb4", ]
+
+
+# remove mitochondrial genes 
+Ex_C1ql4 <- Ex_C1ql4 %>%
+  filter(!grepl("^Mt-", gene))
+
+# filter for cell type 3 
+Ex_Dmrta2 <- top_dxs[top_dxs$cell == "Ex_Dmrta2_Prkcq_4", ]
+
+# remove mitochondrial genes 
+Ex_Dmrta2 <- Ex_Dmrta2 %>%
+  filter(!grepl("^Mt-", gene))
+
+# filter for cell type 4 
+Ex_Fezf2 <- top_dxs[top_dxs$cell == "Ex_Fezf2_Fbln1", ]
+
+# remove mitochondrial genes 
+Ex_Fezf2 <- Ex_Fezf2 %>%
+  filter(!grepl("^Mt-", gene))
+```
+
+## Volcano plots using EnhancedVolcano 
+```{r}
+plot1 <- EnhancedVolcano(Chol_Isl2_Gata6_4,
+                         lab = Chol_Isl2_Gata6_4$gene,
+                         x = 'logFC',
+                         y = 'P.Value',
+                         title = "Chol_Isl2_Gata6_4")
+
+plot2 <- EnhancedVolcano(Ex_C1ql4,
+                         lab = Ex_C1ql4$gene,
+                         x = 'logFC',
+                         y = 'P.Value',
+                        title = "Ex_C1ql4_Asb4")
+
+plot3 <- EnhancedVolcano(Ex_Dmrta2,
+                         lab = Ex_Dmrta2$gene,
+                         x = 'logFC',
+                         y = 'P.Value',
+                        title = "Ex_Dmrta2_Prkcq_4")
+
+plot4 <- EnhancedVolcano(Ex_Fezf2,
+                         lab = Ex_Fezf2$gene,
+                         x = 'logFC',
+                         y = 'P.Value',
+                        title = "Ex_Fezf2_Fbln1")
+
+grid.arrange(plot1, plot2, plot3, plot4, ncol=2, padding = 1)
+```
 

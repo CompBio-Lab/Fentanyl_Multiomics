@@ -22,14 +22,15 @@ library(SeuratDisk)
 library(EnsDb.Rnorvegicus.v75)
 library(GenomicRanges)
 library(Signac)
+library(here)
 ```
 
 ## Load h5 files 
 ```{r}
-r3counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R3.h5")
-r4counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R4.h5")
-r15counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R15.h5")
-r16counts <- Read10X_h5("~/Desktop/Data/GEX/filtered_feature_bc_matrix_R16.h5")
+r3counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R3.h5")
+r4counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R4.h5")
+r15counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R15.h5")
+r16counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R16.h5")
 ```
 
 ## Create GEX Seurat objects 
@@ -88,48 +89,48 @@ r16counts_peaks <- r16counts$Peaks
 chrom_assay_R3 <- CreateChromatinAssay(
   counts = r3counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R3.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/atac_fragments_R3.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 #meta-data for R3 
-metadata_R3 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R3.csv")
+metadata_R3 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/per_barcode_metrics_R3.csv")
 
 #Chromatin assay for R4 
 chrom_assay_R4 <- CreateChromatinAssay(
   counts = r4counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R4.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/atac_fragments_R4.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 
 #meta-data for R4 
-metadata_R4 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R4.csv")
+metadata_R4 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/per_barcode_metrics_R4.csv")
 
 #chromatin assay for R15 
 chrom_assay_R15 <- CreateChromatinAssay(
   counts = r15counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R15.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/atac_fragments_R15.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 
 #meta-data for R15 
-metadata_R15 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R15.csv")
+metadata_R15 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/per_barcode_metrics_R15.csv")
 
 #chromatin assay for R16 
 chrom_assay_R16 <- CreateChromatinAssay(
   counts = r16counts_peaks,
   sep = c(":", "-"),
-  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/atac_fragments_R16.tsv.gz",
+  fragments = "/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/atac_fragments_R16.tsv.gz",
   min.cells = 10, 
   min.features = 200
 )
 
 #meta-data for R16 
-metadata_R16 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/atac_fragments/per_barcode_metrics_R16.csv")
+metadata_R16 <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_fragments/per_barcode_metrics_R16.csv")
 ```
 
 ## Create seurat objects for each sample 
@@ -235,7 +236,7 @@ atac_barcodes <- colnames(atac)
 common_barcodes <- intersect(rna_barcodes, atac_barcodes)
 
 # Save list of common barcodes as an RDS
-saveRDS(common_barcodes, file = "common_barcodes.rds")
+saveRDS(common_barcodes, file = here::here("Data", "common_barcodes.rds"))
 write.csv(common_barcodes, file = "common_barcodes.csv", row.names = FALSE)
 ```
 
@@ -248,7 +249,7 @@ RNA_merged_data <- AddMetaData(RNA_merged_data, colnames(RNA_merged_data), col.n
 RNA_subset <- subset(RNA_merged_data, barcodes %in% common_barcodes)
 
 # Save seurat object for further analysis 
-saveRDS(RNA_subset, file = "RNA_subset.rds")
+saveRDS(RNA_subset, file = here::here("Data", "RNA_subset.rds"))
 ```
 
 
