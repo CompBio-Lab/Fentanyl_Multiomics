@@ -21,7 +21,7 @@ library(future)
 
 ## Load data 
 ```{r}
-seurat_obj <- readRDS("/Users/rishikadaswani/Desktop/rds/GEX_ATAC_Seur.rds")
+seurat_obj <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_Seur.rds")
 ```
 
 ## Add meta data 
@@ -61,8 +61,8 @@ scdiffcom_object <- run_interaction_analysis(
   seurat_condition_id = list(
     column_name = "drug",
     cond1_name = "Saline",
-    cond2_name = "Fentanyl"
-  )
+    cond2_name = "Fentanyl"),
+  iterations = 10000
 )
 ```
 
@@ -93,7 +93,7 @@ ggplot(
   CCI_detected,
   aes(
      x = LOGFC,
-     y = -log10(BH_P_VALUE_DE + 1E-2),
+     y = -log10(P_VALUE_DE + 1E-12),
      colour = REGULATION
   )
 ) + geom_point(
@@ -102,7 +102,7 @@ ggplot(
 ) + xlab(
   "log(FC)"
 ) + ylab(
-  "-log10(Adj. p-value)"
+  "-log10(p-value)"
 )
 ```
 

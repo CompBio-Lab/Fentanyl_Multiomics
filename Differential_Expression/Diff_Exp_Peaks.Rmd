@@ -1,0 +1,121 @@
+---
+title: "Diff_Exp_Peaks.Rmd"
+output: html_document
+date: "2024-05-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Differential Expression Analysis of Peaks using Limma Voom 
+
+## Load libraries 
+```{r}
+library(limma)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(EnhancedVolcano)
+library(Seurat)
+library(gridExtra)
+```
+
+## Load data 
+```{r}
+atac <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/atac_DE.rds")
+```
+
+## Add metadata 
+```{r}
+demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
+                       drug = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
+                       sex = c("Male", "Male", "Female", "Female"))
+demo_10x <- atac@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
+demo_10x <- demo_10x %>% left_join(demo, by = "ids")
+new_metadata <- demo_10x[, c("drug", "sex")]
+atac <- AddMetaData(object = atac, metadata = new_metadata)
+```
+
+## Extract counts 
+```{r}
+eset_atac <- atac@assays$ATAC@counts
+ids <- unlist(sapply(strsplit(colnames(eset_atac), "_"), function(i) i[[1]]))
+sex <- factor(demo_10x[, "sex"], c("Male", "Female"))
+drug <- factor(demo_10x[, "drug"], c("Saline", "Fentanyl"))
+cell_labels <- as.character(Idents(atac))
+```
+
+## Limma Analysis 
+### Limma has a built-in approach for analyzing repeated measures data using duplicateCorrelation(). The model can handle a single random effect, and forces the magnitude of the random effect to be the same across all genes.
+
+## paralellized limma with DupCor 
+
+```{r}
+eset_atac <- as.matrix(eset_atac)
+library(parallel)
+cl <- makeCluster(detectCores())
+clusterExport(cl, c("cell_labels", "sex", "drug", "eset_atac"))
+top_atac <- parLapply(cl, names(table(cell_labels)), function(cell){
+  library(limma);
+  cat(cell, fill = TRUE)
+  keep <- cell_labels %in% cell
+  counts <- eset_atac[, keep]
+  dat <- data.frame(sex = sex[keep],
+                    drug = drug[keep],
+                    subj = gsub("_.*", "", colnames(counts)))
+  
+  design <- model.matrix(~sex*drug, data = dat)
+  vobj_tmp <- voom(counts, design, plot = FALSE)
+  dupcor <- duplicateCorrelation(vobj_tmp, design, block = dat$subj)
+  vobj <- voom(counts, design, plot = FALSE, block = dat$subj, correlation = dupcor$consensus)
+  dupcor <- duplicateCorrelation(vobj, design, block = dat$subj)
+  fitDupCor <- lmFit(vobj, design, block = dat$subj, correlation = dupcor$consensus)
+  fitDupCor <- eBayes(fitDupCor)
+  top_FvsM_atac <- topTable(fitDupCor, coef = "sexFemale", adjust.method = "BH", number = nrow(fitDupCor))
+  top_FvsM_atac$comparison <- "Female_vs_Male"
+  top_FvsM_atac$gene <- rownames(top_FvsM_atac)
+  top_SvsF_atac <- topTable(fitDupCor, coef = "drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
+  top_SvsF_atac$comparison <- "Saline_vs_Fentanyl"
+  top_SvsF_atac$gene <- rownames(top_SvsF_atac)
+  top_int_atac <- topTable(fitDupCor, coef = "sexFemale:drugFentanyl", adjust.method = "BH", number = nrow(fitDupCor))
+  top_int_atac$comparison <- "drug x sex interaction"
+  top_int_atac$gene <- rownames(top_int_atac)
+  top_atac <- rbind(top_FvsM_atac, top_SvsF_atac, top_int_atac)
+  top_atac$cell <- cell
+top_atac }) 
+stopCluster(cl)
+
+top_atac <- Reduce("rbind", top)
+```
+
+## Save top table 
+```{r}
+saveRDS(top_atac, file = here::here("Data", "top_atac.rds"))
+```
+
+## Plot DEGs for all cell types for each interaction  
+```{r}
+top_atac %>% filter(adj.P.Val < 0.01) %>% 
+  group_by(cell, comparison) %>% 
+  summarise(n = n()) %>% 
+  ungroup %>% 
+  complete(cell, comparison) %>% 
+  mutate(comparison = factor(comparison, levels = c("drug x sex interaction", "Female_vs_Male", "Saline_vs_Fentanyl"))) %>% 
+  ggplot(aes(x = reorder(cell, -n), y = n, fill = comparison)) + 
+  geom_bar(stat = "identity", position = "dodge") + scale_y_log10() + 
+  ylab("Number of differentially expressed peaks (FDR<1%)") +   
+  xlab("Cell-type") +   
+  theme_classic() +   
+  theme(legend.position = c(0.9,0.9)) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+top_atac %>% 
+  group_by(cell, comparison) %>% 
+  arrange(adj.P.Val) %>% 
+  mutate(n = 1:n()) %>% 
+  ggplot(aes(x = n, y = adj.P.Val, col= cell)) +
+  geom_line() +
+  facet_wrap(~comparison) 
+
+```

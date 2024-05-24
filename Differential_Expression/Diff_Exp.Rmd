@@ -8,7 +8,7 @@ date: "2024-05-17"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Differential Expression Analysis using Limma Voom 
+# Differential Expression Analysis of Genes using Limma Voom 
 
 ## Load libraries 
 ```{r}
@@ -23,7 +23,7 @@ library(gridExtra)
 
 ## Load data 
 ```{r}
-rna <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/rds/GEX_ATAC_Seur.rds")
+rna <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_Seur.rds")
 ```
 
 ## Add metadata 

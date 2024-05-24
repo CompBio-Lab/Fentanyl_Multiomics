@@ -242,14 +242,21 @@ write.csv(common_barcodes, file = "common_barcodes.csv", row.names = FALSE)
 
 ## Subset RNA seurat object with common cellbarcodes
 ```{r}
-# Add cell barcodes to meta data 
+# Add cell barcodes to meta data in RNA
 RNA_merged_data <- AddMetaData(RNA_merged_data, colnames(RNA_merged_data), col.name = 'barcodes')
 
 # Subset RNA seurat object 
 RNA_subset <- subset(RNA_merged_data, barcodes %in% common_barcodes)
 
+# Add cell barcodes to meta data in atac 
+atac <- AddMetaData(atac, colnames(atac), col.name = 'barcodes')
+
+# Subset atac seurat object 
+atac_subset <- subset(atac, barcodes %in% common_barcodes)
+
 # Save seurat object for further analysis 
 saveRDS(RNA_subset, file = here::here("Data", "RNA_subset.rds"))
+saveRDS(atac_subset, file = here::here("Data", "ATAC_subset.rds"))
 ```
 
 
