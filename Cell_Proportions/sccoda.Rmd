@@ -130,7 +130,7 @@ df <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Cell_Proportio
 
 ```{r}
 # Cell type names
-names <- c("Ex_Fezf2_Fbln1", "Chol_Isl2_Gata6_4", "Ex_Fezf2_Fibcd1_Fos_Tnn", "Inh_Six3_Cela1_1", "Ex_Evx2_Lmcd1_3",
+names <- c("Ex_Fezf2_Fbln1", "Chol_Isl2_Gata6_4", "Inh_Six3_Cela1_1", "Ex_Fezf2_Fibcd1_Fos_Tnn", "Ex_Evx2_Lmcd1_3",
            "Ex_Dmrta2_Prkcq_4", "Ex_Ebf2_Prox1_Pou4f3")
 # Code to generate the plot
 p <- df %>%
