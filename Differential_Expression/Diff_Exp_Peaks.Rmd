@@ -75,46 +75,25 @@ top <- Reduce("rbind", top)
 
 
 
-
-## load top table 
+## load top table (gene activity top table and atac fragments)
 ```{r}
-top_atac <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/top_atac.rds")
+top_ga <- readRDS("/Users/rishikadaswani/Desktop/top_atac_signac_final.rds")
+top_atac <- readRDS("/Users/rishikadaswani/Desktop/top_atac_updated.rds")
 ```
 
-
-## Plot DEGs for all cell types for each interaction  
+## Filter top table for only drug and sex interaction 
 ```{r}
-top_atac %>% filter(adj.P.Val < 0.01) %>% 
-  group_by(cell, comparison) %>% 
-  summarise(n = n()) %>% 
-  ungroup %>% 
-  complete(cell, comparison) %>% 
-  mutate(comparison = factor(comparison, levels = c("drug x sex interaction", "Female_vs_Male", "Saline_vs_Fentanyl"))) %>% 
-  ggplot(aes(x = reorder(cell, -n), y = n, fill = comparison)) + 
-  geom_bar(stat = "identity", position = "dodge") + scale_y_log10() + 
-  ylab("Number of differentially expressed peaks (FDR<1%)") +   
-  xlab("Cell-type") +   
-  theme_classic() +   
-  theme(legend.position = c(0.9,0.9)) + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-top_atac %>% 
-  group_by(cell, comparison) %>% 
-  arrange(adj.P.Val) %>% 
-  mutate(n = 1:n()) %>% 
-  ggplot(aes(x = n, y = adj.P.Val, col= cell)) +
-  geom_line() +
-  facet_wrap(~comparison) 
-
+top_atac_dxs <- top_atac %>% dplyr::filter(top_atac$comparison == "drug x sex interaction")
 ```
 
-
-## Filtering top table 
+## Find closest genes to peaks
 ```{r}
-# filter only for the drug x sex interaction 
-top_dxs <- top_atac[top_atac$comparison == "drug x sex interaction", ]
+Inh_Gata3_Ccdc180_2 <- top_atac_dxs[top_atac_dxs$cell == "Inh_Gata3_Ccdc180_2" & top_atac_dxs$logFC < 3, "gene"]
+Endo_Flth1 <- top_atac_dxs[top_atac_dxs$cell == "Endo_Flt1_Lrg1_1" & top_atac_dxs$logFC < 3, "gene"]
+Ex_Tfap2b <- top_atac_dxs[top_atac_dxs$cell == "Ex_Tfap2b_Ccdc172_Calcr" & top_atac_dxs$logFC < 3, "gene"]
 
-Chol_Isl2_Gata6_4 <- top_dxs[top_dxs$cell == "Chol_Isl2_Gata6_4", ]
+closest_genes_Inh_Gata3 <- ClosestFeature(atac, regions = Inh_Gata3_Ccdc180_2)
+closest_genes_Endo_Flth1 <- ClosestFeature(atac, regions = Endo_Flth1)
+closest_genes_Ex_Tfap2b <- ClosestFeature(atac, regions = Ex_Tfap2b)
+
 ```
-
-
