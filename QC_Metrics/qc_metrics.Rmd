@@ -61,15 +61,18 @@ RNA_merged_data <- merge(r3_RNA, y = c(r4_RNA, r15_RNA, r16_RNA), add.cell.ids =
 # Number of nuclei in each sample before filtering 
 before_filter <- table(Idents(RNA_merged_data))
 
-# Step 1: Remove mitochondrial genes 
+# Step 1: Obtain percentage of mitochondrial genes and store it in meta-data 
+RNA_merged_data[["percent.mt"]] <- PercentageFeatureSet(RNA_merged_data, pattern = "^Mt-")
+
+# Step 2: Visualize violin plot of nCount_RNA, nFeature_RNA, and percent.mt 
+VlnPlot(RNA_merged_data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+# Step 3: Remove cells that have less than 100 features (potential empty droplet) and more than 7500 features (potential doublet) as well as cells that have more than 15% of mitochondrial genes 
+RNA_merged_data <- subset(RNA_merged_data, subset = nFeature_RNA > 100 & nFeature_RNA < 7500 & percent.mt < 15)
+
+# Step 4: Remove mitochondrial genes within those cells 
 keep_genes <- rownames(RNA_merged_data)[-grep("^Mt-", rownames(RNA_merged_data))]
 RNA_merged_data <- subset(RNA_merged_data, features = keep_genes)
-
-# Step 2: Visualize violin plot of nCount_RNA and nFeature_RNA 
-VlnPlot(RNA_merged_data, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
-
-# Step 3: Remove cells that have less than 100 features (potential empty droplet) and more than 7500 features (potential doublet)
-RNA_merged_data <- subset(RNA_merged_data, subset = nFeature_RNA > 100 & nFeature_RNA < 7500)
 
 # Number of nuclei in each sample after filtering 
 after_filter <- table(Idents(RNA_merged_data))
@@ -237,7 +240,7 @@ common_barcodes <- intersect(rna_barcodes, atac_barcodes)
 
 # Save list of common barcodes as an RDS
 saveRDS(common_barcodes, file = here::here("Data", "common_barcodes.rds"))
-write.csv(common_barcodes, file = "common_barcodes.csv", row.names = FALSE)
+write.csv(common_barcodes, file = here::here("Data", "common_barcodes.csv"))
 ```
 
 ## Subset RNA seurat object with common cellbarcodes

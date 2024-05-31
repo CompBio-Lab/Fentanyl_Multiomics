@@ -121,25 +121,25 @@ plt.show()
 # Load libraries 
 ```{r}
 library(tidyverse)
+library(ggplot2)
 ```
 
 # Load csv 
 ```{r}
-df <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Cell_Proportions/log2FC_Fent.csv")
+df <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Cell_Proportions/Fent_final.csv")
 ```
 
 ```{r}
 # Cell type names
-names <- c("Ex_Fezf2_Fbln1", "Chol_Isl2_Gata6_4", "Inh_Six3_Cela1_1", "Ex_Fezf2_Fibcd1_Fos_Tnn", "Ex_Evx2_Lmcd1_3",
-           "Ex_Dmrta2_Prkcq_4", "Ex_Ebf2_Prox1_Pou4f3")
+names <- c("Inh_Gata3_Ccdc180_2","Ex_Ebf2_Fzd9_3","Ex_C1ql4_Drd1_3","Ex_Onecut3_Spag16_3","Ex_Fbxo40_Kcnk5_1","Fibro_Eya2_Ccdc192_2","Ex_C1ql4_Prdm6","Ex_Plekhg1_Nox4_Kcp_2","Inh_Frm7_Otop1_1","Ex_Ebf2_Layn","Ex_Tfap2b_Ccdc172_Calcr","Endo_Flt1_Lrg1_1")
 # Code to generate the plot
 p <- df %>%
-  filter(!Cell.Type %in% seq(7,14,1)) %>%
+  dplyr::filter(!Cell.Type %in% seq(12,17,1)) %>%
   cbind(names) %>%
   mutate(names = factor(names, levels=names)) %>%
   ggplot(aes(x = names, y = log2.fold.change, fill = names)) +
   geom_bar(stat="identity") +
-  scale_fill_manual(values = c('#1F77B4', '#AEC7E8', '#FF7F0E', '#FFB366', '#2CA02C', '#98DF8A', '#D62728' )) + labs(fill = "Cell Type", x = "Cell Type", y = "Log2-fold change") + 
+  scale_fill_manual(values = c('#1F77B4', '#AEC7E8', '#FF7F0E', '#FFB366', '#2CA02C', '#98DF8A', '#D62728', '#FF9896', '#9467BD', '#C5B0D5', '#8C564B', '#D2B48C' )) + labs(fill = "Cell Type", x = "Cell Type", y = "Log2-fold change") + 
   ggtitle("Condition[T.fentanyl]") +
   theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 

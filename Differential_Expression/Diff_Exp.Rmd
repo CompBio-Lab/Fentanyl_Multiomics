@@ -35,7 +35,19 @@ demo_10x <- rna@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids =
 demo_10x <- demo_10x %>% left_join(demo, by = "ids")
 new_metadata <- demo_10x[, c("drug", "sex")]
 rna <- AddMetaData(object = rna, metadata = new_metadata)
+# extract cell types 
+cell_types <- as.character(rna@active.ident)
+rna <- AddMetaData(object = rna, metadata = cell_types, col.name = "celltype")
+
 ```
+
+## Save rds 
+```{r}
+saveRDS(rna, file = here::here("Data", "GEX_ATAC_Seur.rds"))
+```
+
+
+## The rest of this Rmd was put into an Rscript and run on an HPC 
 
 ## Extract counts 
 ```{r}
@@ -43,8 +55,16 @@ eset <- rna@assays$SCT@counts
 ids <- unlist(sapply(strsplit(colnames(eset), "_"), function(i) i[[1]]))
 sex <- factor(demo_10x[, "sex"], c("Male", "Female"))
 drug <- factor(demo_10x[, "drug"], c("Saline", "Fentanyl"))
-cell_labels <- as.character(Idents(rna))
+cell_labels <- rna@meta.data$celltype
 ```
+
+```{r}
+# Remove the specific cell type
+excluded_cell_type <- "Ex_Onecut3_Spag16_3"
+cell_labels <- cell_labels[cell_labels != excluded_cell_type]
+eset <- eset[, cell_labels != excluded_cell_type]
+```
+
 
 ## Frequency of nuclei in each cell type by drug and sex 
 ```{r}
@@ -69,7 +89,7 @@ cc %>%
   geom_bar(stat = "identity", position = "dodge") +
   facet_wrap(~drug, scales = "free") + ggtitle("Frequency of Nuclei in Each Cell Type by Sex and Drug")
 
-summary(lm(Freq ~ Var1*Var2, data = cc))
+summary(lm(Freq ~ sex*drug, data = cc))
 
 ```
 
@@ -118,12 +138,19 @@ top <- Reduce("rbind", top)
 
 ## Save top table 
 ```{r}
-saveRDS(top, file = here::here("Data", "top.rds"))
+saveRDS(top, file = "top_DEG.rds")
 ```
+
+
+## Load top table obtained from above run 
+```{r}
+top <- readRDS("/Users/rishikadaswani/Desktop/top_DEG.rds")
+```
+
 
 ## Plot DEGs for all cell types for each interaction  
 ```{r}
-top %>% filter(adj.P.Val < 0.01) %>% 
+top %>% dplyr::filter(adj.P.Val < 0.5) %>% 
   group_by(cell, comparison) %>% 
   summarise(n = n()) %>% 
   ungroup %>% 
@@ -153,7 +180,7 @@ top %>%
 top_dxs <- top[top$comparison == "drug x sex interaction", ]
 
 # filter for cell type 0 
-Chol_Isl2_Gata6_4 <- top_dxs[top_dxs$cell == "Chol_Isl2_Gata6_4", ]
+Endo_Flt1_Lrg1_1 <- top_dxs[top_dxs$cell == "Endo_Flt1_Lrg1_1", ]
 
 
 #remove mitochondrial genes 
@@ -189,11 +216,11 @@ Ex_Fezf2 <- Ex_Fezf2 %>%
 
 ## Volcano plots using EnhancedVolcano 
 ```{r}
-plot1 <- EnhancedVolcano(Chol_Isl2_Gata6_4,
-                         lab = Chol_Isl2_Gata6_4$gene,
+plot1 <- EnhancedVolcano(Endo_Flt1_Lrg1_1,
+                         lab = Endo_Flt1_Lrg1_1$gene,
                          x = 'logFC',
                          y = 'P.Value',
-                         title = "Chol_Isl2_Gata6_4")
+                         title = "Endo_Flt1_Lrg1_1")
 
 plot2 <- EnhancedVolcano(Ex_C1ql4,
                          lab = Ex_C1ql4$gene,

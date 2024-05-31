@@ -1,17 +1,17 @@
-# Differential Expression Analysis of Peaks using Limma Voom 
+# Differential Expression Analysis of Genes using Limma Voom 
 
 ## Load libraries 
 library(limma)
 
 ## Load data 
-atac <- readRDS("/arc/project/st-singha53-1/rishikad/atac_limma/ATAC_signac.rds")
+rna <- readRDS("/arc/project/st-singha53-1/rishikad/limma/GEX_ATAC_Seur.rds")
 
 ## Extract counts 
-eset <- atac@assays$RNA@counts
+eset <- rna@assays$RNA@layers$counts
 ids <- unlist(sapply(strsplit(colnames(eset), "_"), function(i) i[[1]]))
-sex <- factor(atac@meta.data$sex, levels = c("Male", "Female"))
-drug <- factor(atac@meta.data$drug, levels = c("Saline", "Fentanyl"))
-cell_labels <- atac@meta.data$celltype
+sex <- factor(rna@meta.data$sex, levels = c("Male", "Female"))
+drug <- factor(rna@meta.data$drug, levels = c("Saline", "Fentanyl"))
+cell_labels <- rna@meta.data$celltype
 
 # Remove the specific cell type
 excluded_cell_type <- "Ex_Onecut3_Spag16_3"
@@ -53,3 +53,6 @@ top <- parLapply(cl, names(table(cell_labels)), function(cell){
 stopCluster(cl)
 
 top <- Reduce("rbind", top)
+
+
+saveRDS(top, file = "top_DEG.rds")

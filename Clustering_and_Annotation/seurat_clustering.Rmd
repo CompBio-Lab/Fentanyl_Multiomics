@@ -27,7 +27,7 @@ library(SeuratDisk)
 ## Load Data 
 ```{r}
 # Load rds from QC metrics step 
-RNA <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/QC_Metrics/RNA_subset.rds")
+RNA <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/RNA_subset.rds")
 ```
 
 ## Normalizing the data 
@@ -125,14 +125,13 @@ saveRDS(RNA, file = here::here("Data", 'GEX_seur.rds'))
 ## Add data (clusters) from MultiVI (GEX + ATAC) into seurat object 
 ```{r}
 #read in csv 
-leiden_data <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/leiden_column_new.csv")
+leiden_data <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/leiden_column_final.csv")
 
 #convert to factor class 
 leiden_data_factor <- factor(leiden_data$leiden)
 
 # replace "seurat_clusters" in metadata with leiden_data 
 RNA@meta.data$seurat_clusters <- leiden_data_factor
-
 
 # replace Idents in metadata with leiden_data 
 leiden_column <- leiden_data$leiden
@@ -141,10 +140,36 @@ Idents(RNA) <- leiden_column
 
 ## Find Cluster Markers 
 ```{r}
+# find markers for each cluster 
 cluster_markers <- FindAllMarkers(RNA)
+
+# order the clusters
+cluster_markers$cluster <- factor(cluster_markers$cluster, levels = 0:16)
+
+# Arrange the data frame by the ordered 'cluster' column
+cluster_markers <- cluster_markers %>%
+  arrange(cluster)
+
+# arrange by adj p value and take top 30 genes for each cluster 
+cluster_markers_filtered <- cluster_markers %>%  group_by(cluster) %>%  arrange(p_val_adj) %>%  slice_head(n = 150) %>%  ungroup()
+
+# create UpSet plot to make sure no genes are overlapping in each of the clusters 
+
+library(UpSetR)
+library(tibble)
+
+# Prepare the list of genes for each cluster
+markers <- cluster_markers %>%
+  group_by(cluster) %>%
+  summarise(genes = list(gene)) %>%
+  deframe()
+
+# Create the UpSet plot
+upset(fromList(markers), nsets = length(markers))
+
 ```
 
-## Fast Gene Set Enrichement Analysis (GEX + ATAC)
+## Fast Gene Set Enrichement Analysis (with MultVI leiden column)
 ```{r}
 
 mouse_brain <- read.csv("~/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/biorxiv_mouse_brain.csv")
@@ -154,11 +179,10 @@ mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||=
 names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
 mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
 
-fc <- cluster_markers$avg_log2FC
-names(fc) <- rownames(cluster_markers)
-fc_cl <- split(fc, cluster_markers$cluster)
+fc <- cluster_markers_filtered$avg_log2FC
+names(fc) <- rownames(cluster_markers_filtered)
+fc_cl <- split(fc, cluster_markers_filtered$cluster)
 
- 
 
 cluster_annotations <- lapply(fc_cl, function(i){
   res <- fgsea(mbrain_genesets, i)
@@ -167,17 +191,6 @@ cluster_annotations <- lapply(fc_cl, function(i){
 })
 ```
 
-## Order cluster_annotations
-```{r}
-# Order the list indices sequentially
-ordered_indices <- order(as.numeric(names(cluster_annotations)))
-
-# Reorder the list using the ordered indices
-cluster_annotations <- cluster_annotations[ordered_indices]
-
-# Rename the list elements to match the new order
-names(cluster_annotations) <- 0:(length(cluster_annotations) - 1)
-```
 
 # Labelling clusters with cell type 
 ```{r}

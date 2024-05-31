@@ -36,7 +36,7 @@ seurat_obj <- AddMetaData(
 )
 
 # Add condition to meta-data
-drug = rep(c("Saline", "Fentanyl", "Fentanyl", "Saline"), c(4567, 444, 2466, 1284))
+drug = rep(c("Saline", "Fentanyl", "Fentanyl", "Saline"), c(4501, 444, 2364, 1284))
 names(drug) <- colnames(x = seurat_obj)
 seurat_obj <- AddMetaData(
   object = seurat_obj,
@@ -61,8 +61,7 @@ scdiffcom_object <- run_interaction_analysis(
   seurat_condition_id = list(
     column_name = "drug",
     cond1_name = "Saline",
-    cond2_name = "Fentanyl"),
-  iterations = 10000
+    cond2_name = "Fentanyl")
 )
 ```
 
@@ -74,7 +73,7 @@ CCI_detected <- GetTableCCI(scdiffcom_object, type = "detected", simplified = TR
 # Number of CCIs per regulation type (here with age)
 table(CCI_detected$REGULATION)
 ## DOWN  FLAT   NSC    UP 
-  # 134   132  70      4 
+  # 59   123    135    2 
 
 
 # Retrieve the ORA results

@@ -25,7 +25,7 @@ library(SeuratDisk)
 
 # Load in data (seurat object)
 ```{r}
-GEX_ATAC_seur <- readRDS("/Users/rishikadaswani/Desktop/rds/GEX_ATAC_Seur.rds")
+GEX_ATAC_seur <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_Seur.rds")
 ```
 
 # Add meta data to run scCODA analysis
@@ -41,10 +41,7 @@ GEX_ATAC_seur@meta.data$SampleID <- GEX_ATAC_seur@meta.data$orig.ident
 
 # Create a column in metadata called cell_type with cell types in cluster_annotations (csv can be found in clustering_and_annotation folder) 
 
-cell_types <- c("Ex_Fezf2_Fbln1", "Chol_Isl2_Gata6_4", "Ex_Fezf2_Fibcd1_Fos_Tnn", "Inh_Six3_Cela1_1", 
-  "Ex_Evx2_Lmcd1_3", "Ex_Dmrta2_Prkcq_4", "Ex_Ebf2_Prox1_Pou4f3", "Fibro_Eya2_Slc47a1_2", "Ex_Lhx9_Tyrp1_4", 
-  "Ex_Evx2_Lmcd1_2", "Ex_Lhx9_Tyrp1_4_1", "Ex_C1ql4_Asb4", "Ex_Ebf2_Pla2g5_12", "Chol_Tbx20_S100a11_8", 
-  "Inh_Nkx2-2_Glp1r_Trh_1")
+cell_types <- c("Inh_Gata3_Ccdc180_2","Ex_Ebf2_Fzd9_3","Ex_C1ql4_Drd1_3","Ex_Onecut3_Spag16_3","Ex_Fbxo40_Kcnk5_1","Fibro_Eya2_Ccdc192_2","Ex_C1ql4_Prdm6","Ex_Plekhg1_Nox4_Kcp_2","Inh_Frm7_Otop1_1","Ex_Ebf2_Layn","Ex_Tfap2b_Ccdc172_Calcr","Endo_Flt1_Lrg1_1","Endo_Flt1_Ssu2_1","Ex_Fibcd1_Psrc1_4","Ex_Crym_Odad2_Fos","Ex_Sim1_Aox3_1","Ex_Ebf2_Crhr2_1")
 
 GEX_ATAC_seur@meta.data$cell_type <- NA
 GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, levels = cell_types)
@@ -54,6 +51,6 @@ GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, l
 ```{r}
 # Save object as h5ad for input into sccoda 
 SaveH5Seurat(GEX_ATAC_seur, filename = here::here("Data", "GEX_ATAC_scCODA.h5Seurat"))
-Convert("GEX_ATAC_scCODA.h5Seurat", dest = "h5ad")
+Convert("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_scCODA.h5Seurat", dest = "h5ad")
 ```
 
