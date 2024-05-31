@@ -39,6 +39,16 @@ rna <- AddMetaData(object = rna, metadata = new_metadata)
 cell_types <- as.character(rna@active.ident)
 rna <- AddMetaData(object = rna, metadata = cell_types, col.name = "celltype")
 
+# Join RNA count layers 
+rna[["RNA"]] <- JoinLayers(rna[["RNA"]])
+
+# Extract cell barcodes and genes from the SCT assay
+cell_barcodes <- colnames(rna)
+gene_names <- rownames(rna)
+
+# Assign cell barcodes and gene names to the dimnames of the counts matrix
+dimnames(rna@assays$RNA@layers$counts) <- list(gene_names, cell_barcodes)
+
 ```
 
 ## Save rds 
@@ -51,7 +61,7 @@ saveRDS(rna, file = here::here("Data", "GEX_ATAC_Seur.rds"))
 
 ## Extract counts 
 ```{r}
-eset <- rna@assays$SCT@counts
+eset <- rna@assays$RNA@layers$counts
 ids <- unlist(sapply(strsplit(colnames(eset), "_"), function(i) i[[1]]))
 sex <- factor(demo_10x[, "sex"], c("Male", "Female"))
 drug <- factor(demo_10x[, "drug"], c("Saline", "Fentanyl"))
@@ -144,13 +154,13 @@ saveRDS(top, file = "top_DEG.rds")
 
 ## Load top table obtained from above run 
 ```{r}
-top <- readRDS("/Users/rishikadaswani/Desktop/top_DEG.rds")
+top <- readRDS("/Users/rishikadaswani/Desktop/top_DEG_new.rds")
 ```
 
 
 ## Plot DEGs for all cell types for each interaction  
 ```{r}
-top %>% dplyr::filter(adj.P.Val < 0.5) %>% 
+top_atac %>% dplyr::filter(adj.P.Val < 0.05) %>% 
   group_by(cell, comparison) %>% 
   summarise(n = n()) %>% 
   ungroup %>% 
