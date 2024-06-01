@@ -23,7 +23,7 @@ library(gridExtra)
 
 ## Load data 
 ```{r}
-rna <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_Seur.rds")
+rna <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
 ## Add metadata 

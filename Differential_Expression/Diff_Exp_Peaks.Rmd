@@ -88,12 +88,36 @@ top_atac_dxs <- top_atac %>% dplyr::filter(top_atac$comparison == "drug x sex in
 
 ## Find closest genes to peaks
 ```{r}
+# step 1: run closest feature that gives you the closest genes using the regions from atac object 
+closest_genes <- ClosestFeature(atac, regions = granges(atac))
+
+# step 2: filter gene activity top table to get highly expressed genes 
+highly_expressed_genes <- top_ga[top_ga$adj.P.Val < 0.01, "gene"]
+
+# Step 3: match closest genes with highly expressed genes 
+highly_expressed_closest_genes <- closest_genes[closest_genes$gene %in% highly_expressed_genes, ]
+
+# Step 4: identify differentially expressed peaks from top_atac. The fragments are in the column labelled "gene" but these are fragments. 
+differentially_expressed_peaks <- top_atac[top_atac$adj.P.Val < 0.01, "gene"]
+
+# Step 5: Combine the information to obtain a data frame which shows highly expressed peaks connected to which highly expressed genes 
+# Merge highly expressed closest genes with differentially expressed peaks
+result <- merge(highly_expressed_closest_genes, top_atac, by.x = "gene", by.y = "gene")
+
+# Filter for peaks that are differentially expressed by adjusted p-value
+result <- result[result$peak %in% differentially_expressed_peaks, ]
+
+
+
+
 Inh_Gata3_Ccdc180_2 <- top_atac_dxs[top_atac_dxs$cell == "Inh_Gata3_Ccdc180_2" & top_atac_dxs$logFC < 3, "gene"]
 Endo_Flth1 <- top_atac_dxs[top_atac_dxs$cell == "Endo_Flt1_Lrg1_1" & top_atac_dxs$logFC < 3, "gene"]
 Ex_Tfap2b <- top_atac_dxs[top_atac_dxs$cell == "Ex_Tfap2b_Ccdc172_Calcr" & top_atac_dxs$logFC < 3, "gene"]
+Ex_C1ql4 <- top_atac_dxs[top_atac_dxs$cell == "Ex_C1ql4_Drd1_3" & top_atac_dxs$logFC < 3, "gene"]
 
 closest_genes_Inh_Gata3 <- ClosestFeature(atac, regions = Inh_Gata3_Ccdc180_2)
 closest_genes_Endo_Flth1 <- ClosestFeature(atac, regions = Endo_Flth1)
 closest_genes_Ex_Tfap2b <- ClosestFeature(atac, regions = Ex_Tfap2b)
+closest_genes_Ex_C1ql4 <- ClosestFeature(atac, regions = Ex_C1ql4)
 
 ```
