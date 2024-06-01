@@ -160,7 +160,7 @@ top <- readRDS("/Users/rishikadaswani/Desktop/top_DEG_new.rds")
 
 ## Plot DEGs for all cell types for each interaction  
 ```{r}
-top_atac %>% dplyr::filter(adj.P.Val < 0.05) %>% 
+top %>% dplyr::filter(adj.P.Val < 0.05) %>% 
   group_by(cell, comparison) %>% 
   summarise(n = n()) %>% 
   ungroup %>% 
