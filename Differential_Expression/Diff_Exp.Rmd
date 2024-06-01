@@ -148,13 +148,13 @@ top <- Reduce("rbind", top)
 
 ## Save top table 
 ```{r}
-saveRDS(top, file = "top_DEG.rds")
+saveRDS(top, file = "top_DEG_new.rds")
 ```
 
 
 ## Load top table obtained from above run 
 ```{r}
-top <- readRDS("/Users/rishikadaswani/Desktop/top_DEG_new.rds")
+top <- readRDS(here::here("Data", "top_DEG_new.rds"))
 ```
 
 
