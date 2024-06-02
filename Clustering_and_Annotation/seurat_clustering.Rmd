@@ -27,7 +27,7 @@ library(SeuratDisk)
 ## Load Data 
 ```{r}
 # Load rds from QC metrics step 
-RNA <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/RNA_subset.rds")
+RNA <- readRDS(here::here("Data", "RNA_subset.rds"))
 ```
 
 ## Normalizing the data 
@@ -92,7 +92,7 @@ cluster_markers <- FindAllMarkers(RNA) # finds which genes are different
 
 ## Fast gene set enrichment analysis (fgsea) for only GEX data 
 ```{r}
-mouse_brain <- read.csv("~/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/biorxiv_mouse_brain.csv")
+mouse_brain <- read.csv(here::here("Data", "biorxiv_mouse_brain.csv"))
 mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
   i[-grep("ENS", i)]
 })
@@ -125,7 +125,7 @@ saveRDS(RNA, file = here::here("Data", 'GEX_seur.rds'))
 ## Add data (clusters) from MultiVI (GEX + ATAC) into seurat object 
 ```{r}
 #read in csv 
-leiden_data <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/leiden_column_final.csv")
+leiden_data <- read.csv(here::here("Data", "leiden_column_final.csv"))
 
 #convert to factor class 
 leiden_data_factor <- factor(leiden_data$leiden)
@@ -172,7 +172,7 @@ upset(fromList(markers), nsets = length(markers))
 ## Fast Gene Set Enrichement Analysis (with MultVI leiden column)
 ```{r}
 
-mouse_brain <- read.csv("~/Desktop/Fentanyl_Multiomics/Clustering_and_Annotation/biorxiv_mouse_brain.csv")
+mouse_brain <- read.csv(here::here("Data", "biorxiv_mouse_brain.csv"))
 mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
   i[-grep("ENS", i)]
 })
