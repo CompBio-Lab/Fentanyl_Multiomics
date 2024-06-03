@@ -22,7 +22,7 @@ library(gridExtra)
 
 ```{r}
 ## Load data 
-atac <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/ATAC_signac.rds")
+atac <- readRDS(here::here("Data", "ATAC_signac.rds"))
 
 ## Extract counts 
 eset <- atac@assays$RNA@counts
@@ -77,8 +77,8 @@ top <- Reduce("rbind", top)
 
 ## load top table (gene activity top table and atac fragments)
 ```{r}
-top_ga <- readRDS("/Users/rishikadaswani/Desktop/top_atac_signac_final.rds")
-top_atac <- readRDS("/Users/rishikadaswani/Desktop/top_atac_updated.rds")
+top_ga <- readRDS(here::here("Data", "top_atac_signac_final.rds"))
+top_atac <- readRDS(here::here("Data", "top_atac_updated.rds"))
 ```
 
 ## Filter top table for only drug and sex interaction 

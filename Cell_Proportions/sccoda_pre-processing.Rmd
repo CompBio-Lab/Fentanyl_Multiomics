@@ -25,7 +25,7 @@ library(SeuratDisk)
 
 # Load in data (seurat object)
 ```{r}
-GEX_ATAC_seur <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_Seur.rds")
+GEX_ATAC_seur <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
 # Add meta data to run scCODA analysis
@@ -51,6 +51,6 @@ GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, l
 ```{r}
 # Save object as h5ad for input into sccoda 
 SaveH5Seurat(GEX_ATAC_seur, filename = here::here("Data", "GEX_ATAC_scCODA.h5Seurat"))
-Convert("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_scCODA.h5Seurat", dest = "h5ad")
+Convert(here::here("Data", "GEX_ATAC_scCODA.h5Seurat", dest = "h5ad"))
 ```
 

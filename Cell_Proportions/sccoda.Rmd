@@ -126,7 +126,7 @@ library(ggplot2)
 
 # Load csv 
 ```{r}
-df <- read.csv("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Cell_Proportions/Fent_final.csv")
+df <- read.csv(here::here("Data", "Fent_final.csv"))
 ```
 
 ```{r}

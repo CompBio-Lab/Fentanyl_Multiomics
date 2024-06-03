@@ -21,7 +21,7 @@ library(GenomicRanges)
 
 ## Load ATAC seurat object from qc_metrics rmd 
 ```{r}
-atac <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/ATAC_subset.rds")
+atac <- readRDS(here::here ("Data", "ATAC_subset.rds"))
 ```
 
 ## Normalization and linear dimensional reduction 
@@ -81,7 +81,7 @@ CoveragePlot(
 
 ## Load in seurat object 
 ```{r}
-gex_atac <- readRDS("/Users/rishikadaswani/Desktop/Fentanyl_Multiomics/Data/GEX_ATAC_Seur.rds")
+gex_atac <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
 ## Extract cell labels 
