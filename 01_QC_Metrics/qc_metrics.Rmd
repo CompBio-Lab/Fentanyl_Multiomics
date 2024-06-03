@@ -27,10 +27,10 @@ library(here)
 
 ## Load h5 files 
 ```{r}
-r3counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R3.h5")
-r4counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R4.h5")
-r15counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R15.h5")
-r16counts <- Read10X_h5("~/Desktop/Fentanyl_Multiomics/Data/filtered_feature_bc_matrix_R16.h5")
+r3counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R3.h5"))
+r4counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R4.h5"))
+r15counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R15.h5"))
+r16counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R16.h5"))
 ```
 
 ## Create GEX Seurat objects 

@@ -26,14 +26,6 @@ seurat_obj <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 
 ## Add meta data 
 ```{r}
-# Add cell types to meta-data 
-cell_type <- Idents(object = seurat_obj)
-names(cell_type) <- colnames(x = seurat_obj)
-seurat_obj <- AddMetaData(
-  object = seurat_obj,
-  metadata = cell_type,
-  col.name = 'cell_type'
-)
 
 # Add condition to meta-data
 drug = rep(c("Saline", "Fentanyl", "Fentanyl", "Saline"), c(4501, 444, 2364, 1284))
@@ -45,11 +37,6 @@ seurat_obj <- AddMetaData(
 
 
 plan(sequential)
-```
-
-## JoinLayers function to join the layers within the seurat object 
-```{r}
-seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
 ```
 
 ## Run differential analysis with default parameters 

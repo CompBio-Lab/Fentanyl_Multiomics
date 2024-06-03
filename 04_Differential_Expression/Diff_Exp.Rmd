@@ -26,37 +26,6 @@ library(gridExtra)
 rna <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
-## Add metadata 
-```{r}
-demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
-                       drug = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
-                       sex = c("Male", "Male", "Female", "Female"))
-demo_10x <- rna@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
-demo_10x <- demo_10x %>% left_join(demo, by = "ids")
-new_metadata <- demo_10x[, c("drug", "sex")]
-rna <- AddMetaData(object = rna, metadata = new_metadata)
-# extract cell types 
-cell_types <- as.character(rna@active.ident)
-rna <- AddMetaData(object = rna, metadata = cell_types, col.name = "celltype")
-
-# Join RNA count layers 
-rna[["RNA"]] <- JoinLayers(rna[["RNA"]])
-
-# Extract cell barcodes and genes from the SCT assay
-cell_barcodes <- colnames(rna)
-gene_names <- rownames(rna)
-
-# Assign cell barcodes and gene names to the dimnames of the counts matrix
-dimnames(rna@assays$RNA@layers$counts) <- list(gene_names, cell_barcodes)
-
-```
-
-## Save rds 
-```{r}
-saveRDS(rna, file = here::here("Data", "GEX_ATAC_Seur.rds"))
-```
-
-
 ## The rest of this Rmd was put into an Rscript and run on an HPC 
 
 ## Extract counts 
@@ -148,13 +117,13 @@ top <- Reduce("rbind", top)
 
 ## Save top table 
 ```{r}
-saveRDS(top, file = "top_DEG_new.rds")
+saveRDS(top, file = "top_gex.rds")
 ```
 
 
 ## Load top table obtained from above run 
 ```{r}
-top <- readRDS(here::here("Data", "top_DEG_new.rds"))
+top <- readRDS(here::here("Data", "top_gex.rds"))
 ```
 
 
