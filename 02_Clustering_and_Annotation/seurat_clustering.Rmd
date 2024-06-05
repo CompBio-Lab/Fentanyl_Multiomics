@@ -202,6 +202,35 @@ RNA <- RenameIdents(RNA, cluster_annotations)
 write.csv(as.data.frame(cluster_annotations), "cluster_annotations.csv", row.names = FALSE)
 ```
 
+## Add meta data to seurat object 
+```{r}
+demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
+                       drug = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
+                       sex = c("Male", "Male", "Female", "Female"))
+demo_10x <- RNA@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
+demo_10x <- demo_10x %>% left_join(demo, by = "ids")
+new_metadata <- demo_10x[, c("drug", "sex")]
+
+RNA <- AddMetaData(object = RNA, metadata = new_metadata)
+
+# Create a column in metadata called SampleID with same info as orig.ident 
+RNA@meta.data$SampleID <- RNA@meta.data$orig.ident
+
+# extract cell types 
+cell_types <- as.character(RNA@active.ident)
+RNA <- AddMetaData(object = RNA, metadata = cell_types, col.name = "cell_type")
+
+# Join RNA count layers 
+RNA[["RNA"]] <- JoinLayers(RNA[["RNA"]])
+
+# Extract cell barcodes and genes from the SCT assay
+cell_barcodes <- colnames(RNA)
+gene_names <- rownames(RNA)
+
+# Assign cell barcodes and gene names to the dimnames of the counts matrix
+dimnames(RNA@assays$RNA@layers$counts) <- list(gene_names, cell_barcodes)
+```
+
 ## Save GEX+ATAC seurat object 
 ```{r}
 saveRDS(RNA, file = here::here("Data", 'GEX_ATAC_Seur.rds'))

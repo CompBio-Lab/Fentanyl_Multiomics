@@ -18,6 +18,7 @@ library(tidyr)
 library(ggplot2)
 library(EnhancedVolcano)
 library(gridExtra)
+library(ComplexHeatmap)
 ```
 
 ```{r}
@@ -71,24 +72,22 @@ top <- parLapply(cl, names(table(cell_labels)), function(cell){
 stopCluster(cl)
 
 top <- Reduce("rbind", top)
+
+## Save top table as rds 
+saveRDS(top, file = "top_atac.rds")
 ```
 
 
 ## load all 3 top tables (atac, gene activity and gene expression)
 ```{r}
 # gene activity top table 
-top_ga <- readRDS(here::here("Data", "top_atac_signac_final.rds"))
+top_ga <- readRDS(here::here("Data", "top_ga.rds"))
 
 # top table for just fragments 
-top_atac <- readRDS(here::here("Data", "top_atac_updated.rds"))
+top_atac <- readRDS(here::here("Data", "top_atac.rds"))
 
 # top table using RNA counts 
-top_rna <- readRDS(here::here("Data", "top_DEG_new.rds"))
-```
-
-## Filter top table for only drug and sex interaction 
-```{r}
-top_atac_dxs <- top_atac %>% dplyr::filter(top_atac$comparison == "drug x sex interaction")
+top_rna <- readRDS(here::here("Data", "top_gex.rds"))
 ```
 
 ## Find closest genes to peaks
@@ -96,14 +95,51 @@ top_atac_dxs <- top_atac %>% dplyr::filter(top_atac$comparison == "drug x sex in
 # step 1: run closest feature that gives you the closest genes using the regions from atac object 
 closest_genes <- ClosestFeature(atac, regions = granges(atac))
 
-# Step 4: identify differentially expressed peaks from top_atac. The fragments are in the column labelled "gene" but these are fragments. 
-differentially_expressed_peaks <- top_atac[top_atac$adj.P.Val < 0.01, "gene"]
+# Step 2: Filter differentially expressed peaks top table
+differentially_expressed_peaks <- top_atac[top_atac$comparison == "drug x sex interaction" & top_atac$adj.P.Val < 0.01, ]
 
-# Step 5: Combine the information to obtain a data frame which shows highly expressed peaks connected to which highly expressed genes 
-# Merge highly expressed closest genes with differentially expressed peaks
-result <- merge(highly_expressed_closest_genes, top_atac, by.x = "gene", by.y = "gene")
+# Rename the 'gene' column to 'regions' as they are actully regions
+differentially_expressed_peaks <- differentially_expressed_peaks %>%
+  rename(regions = gene)
 
-# Filter for peaks that are differentially expressed by adjusted p-value
-result <- result[result$peak %in% differentially_expressed_peaks, ]
+# Step 3: Left join query regions (from closest_genes) with regions that are differentially expressed (in differentially expressed peaks) and add the genes from the gene col into top table. 
+differentially_expressed_peaks <- left_join(differentially_expressed_peaks, 
+                         closest_genes %>% select(query_region, gene_name), 
+                         by = c("regions" = "query_region"))
+
+# Step 4: Filter differentially expressed genes top (top_gex) table by comparison and adjusted p value (< 0.01)
+differentially_expressed_genes <- top_rna[top_rna$comparison == "drug x sex interaction" & top_rna$adj.P.Val < 0.01, ]
+```
+
+
+```{r}
+# Step 5: Create heatmap with the x axis being the different cell types and the columns being number of genes that are only atac, number of genes that intersect and number of genes from gex. library(dplyr)
+
+
+# Define the categories
+categories <- c("Only ATAC", "Intersect", "Only GEX")
+
+# Group by cell type and summarize
+counts_df <- differentially_expressed_peaks %>%
+  group_by(cell) %>%
+  summarise(
+    only_atac_genes = sum(!gene_name %in% differentially_expressed_genes$gene),
+    intersect_genes = sum(gene_name %in% differentially_expressed_genes$gene),
+    only_gex_genes = sum(!differentially_expressed_genes$gene %in% gene_name)
+  ) %>%
+  ungroup()
+
+# Convert the data frame to a matrix for the heatmap
+counts_matrix <- as.matrix(counts_df[, -1])
+rownames(counts_matrix) <- counts_df$cell
+
+# Create the heatmap
+Heatmap(counts_matrix,
+        name = "Number of Genes",
+        row_title = "Cell Types",
+        column_title = "Gene Categories",
+        show_row_names = TRUE,
+        show_column_names = TRUE,
+        column_names_side = "bottom")
 
 ```
