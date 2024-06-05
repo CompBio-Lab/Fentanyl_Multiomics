@@ -35,6 +35,7 @@ ids <- unlist(sapply(strsplit(colnames(eset), "_"), function(i) i[[1]]))
 sex <- factor(demo_10x[, "sex"], c("Male", "Female"))
 drug <- factor(demo_10x[, "drug"], c("Saline", "Fentanyl"))
 cell_labels <- rna@meta.data$celltype
+drug <- rna@meta.data$drug
 ```
 
 ```{r}
@@ -159,7 +160,34 @@ top %>%
 top <- top[complete.cases(top$adj.P.Val), ]
 
 # subset based on comparison and adjusted p value 
-top_dxs <- top[top$comparison == "drug x sex interaction" & top$adj.P.Val < 0.001, ]
+top_fxs <- top[top$comparison == "Saline_vs_Fentanyl" & top$adj.P.Val < 1e-08, ]
+
+ex_crym <- top_fxs[top_fxs$cell == "Endo_Flt1_Lrg1_1", ]
+
+sex <- rna@meta.data$sex
+keep <- cell_labels %in% "Endo_Flt1_Lrg1_1"
+counts <- eset[, keep]
+dat <- data.frame(sex = sex[keep],
+                  drug = drug[keep],
+                  subj = gsub("_.*", "", colnames(counts)))
+design <- model.matrix(~sex*drug, data = dat)
+vobj_tmp <- voom(counts, design, plot = FALSE)
+counts <- vobj_tmp$E
+gene <- "St6galnac3"
+
+dat %>% 
+  mutate(gene = counts[gene, ]) %>% 
+  group_by(sex, drug, subj) %>% 
+  summarise(avg = mean(gene)) %>% 
+  ggplot(aes(x = drug, y = avg)) +
+  geom_boxplot()
+
+
+plot(counts[gene, ]~factor(drug[keep]))
+fit <- lm(counts[gene, ]~sex*drug, data = dat)
+summary(lm(counts[gene, ]~sex*drug, data = dat))
+
+termplot(fit)
 
 # Filter for each cell type  
 Endo_Flt1_Lrg1_1 <- top_dxs[top_dxs$cell == "Endo_Flt1_Lrg1_1", ]
