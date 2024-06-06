@@ -1,0 +1,210 @@
+---
+title: "Diff_ExpMuscat_GA"
+output: html_document
+date: "2024-06-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Differential State Analysis with `muscat` (Gene Activity Counts)
+
+## Load packages 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(limma)
+library(muscat)
+library(purrr)
+library(scater)
+library(sctransform)
+library(UpSetR)
+```
+
+## Load data 
+```{r}
+# load seurat object rds as single cell experiment 
+sce <- Seurat::as.SingleCellExperiment(readRDS(here::here("Data", "ATAC_signac.rds")))
+dim(sce)
+```
+
+```{r}
+library(scater)
+# remove undetected genes
+sce <- sce[rowSums(counts(sce) > 0) > 0, ]
+dim(sce)
+```
+
+```{r}
+# calculate per-cell quality control (QC) metrics
+library(scater)
+qc <- perCellQCMetrics(sce)
+
+# remove cells with few or many detected genes
+ol <- isOutlier(metric = qc$detected, nmads = 2, log = TRUE)
+sce <- sce[, !ol]
+dim(sce)
+```
+
+```{r}
+# remove lowly expressed genes
+sce <- sce[rowSums(counts(sce) > 1) >= 10, ]
+dim(sce)
+```
+
+```{r}
+# compute sum-factors & normalize
+sce <- computeLibraryFactors(sce)
+sce <- logNormCounts(sce)
+
+library(sctransform)
+assays(sce)$vstresiduals <- vst(counts(sce), verbosity = FALSE)$y
+```
+
+```{r}
+library(muscat)
+sce$id <- paste0(sce$drug, sce$orig.ident)
+(sce <- prepSCE(sce, 
+    kid = "celltype", # subpopulation assignments
+    gid = "drug",  # group IDs (ctrl/stim)
+    sid = "id",   # sample IDs (ctrl/stim.1234)
+    drop = TRUE))  # drop all other colData columns
+
+nk <- length(kids <- levels(sce$cluster_id))
+ns <- length(sids <- levels(sce$sample_id))
+names(kids) <- kids; names(sids) <- sids
+```
+
+```{r}
+# nb. of cells per cluster-sample
+df <- t(table(sce$cluster_id, sce$sample_id))
+df
+
+```
+
+```{r}
+
+gplots::heatmap.2(df/rowSums(df), trace="none",
+                  margins = c(15, 10))
+```
+
+## aggregate data
+
+```{r}
+pb <- aggregateData(sce,
+    assay = "counts", fun = "sum",
+    by = c("cluster_id", "sample_id"))
+# one sheet per subpopulation
+assayNames(pb)
+```
+
+```{r}
+# pseudobulks for 1st subpopulation
+t(head(assay(pb)))
+```
+```{r}
+(pb_mds <- pbMDS(pb))
+```
+```{r}
+# use very distinctive shaping of groups & change cluster colors
+pb_mds <- pb_mds + 
+  scale_shape_manual(values = c(17, 4)) +
+  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(6, "Set2"), RColorBrewer::brewer.pal(3, "Set3")))
+# change point size & alpha
+pb_mds$layers[[1]]$aes_params$size <- 5
+pb_mds$layers[[1]]$aes_params$alpha <- 0.6
+pb_mds
+```
+
+```{r}
+library(limma)
+# construct design & contrast matrix
+ei <- metadata(sce)$experiment_info
+ei$group_id <- relevel(ei$group_id, ref = "Saline")
+mm <- model.matrix(~ 0 + ei$group_id)
+dimnames(mm) <- list(ei$sample_id, levels(ei$group_id))
+contrast <- makeContrasts("Fentanyl-Saline", levels = mm)
+
+# run DS analysis
+pbDS(pb, design = mm, contrast = contrast, method="limma-voom")
+```
+
+## results
+
+```{r}
+# filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
+tbl_fil <- lapply(tbl, function(u) {
+  u <- dplyr::filter(u, p_adj.loc < 0.3)
+  dplyr::arrange(u, p_adj.loc)
+})
+
+# nb. of DS genes & % of total by cluster
+n_de <- vapply(tbl_fil, nrow, numeric(1))
+p_de <- format(n_de / nrow(sce) * 100, digits = 3)
+data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
+```
+
+```{r}
+library(dplyr)
+# view top 2 hits in each cluster
+top2 <- bind_rows(lapply(tbl_fil, top_n, 2, p_adj.loc))
+format(top2[, -ncol(top2)], digits = 2)
+```
+
+## calculate expression frequencies
+
+```{r}
+frq <- calcExprFreqs(sce, assay = "counts", th = 0)
+# one sheet per cluster
+assayNames(frq)
+```
+```{r}
+gids <- levels(sce$group_id)
+frq10 <- vapply(as.list(assays(frq)), 
+  function(u) apply(u[, gids] > 0.1, 1, any), 
+  logical(nrow(sce)))
+t(head(frq10))
+```
+
+```{r}
+kids2 <- names(tbl_fil)[sapply(tbl_fil, nrow) != 0]
+names(kids2) <- kids2
+
+tbl_fil2 <- lapply(kids2, function(k)
+  dplyr::filter(tbl_fil[[k]], 
+    gene %in% names(which(frq10[, k]))))
+
+# nb. of DS genes & % of total by cluster
+n_de <- vapply(tbl_fil2, nrow, numeric(1))
+p_de <- format(n_de / nrow(sce) * 100, digits = 3)
+data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
+```
+
+```{r}
+top <- do.call(rbind, tbl_fil2)
+
+top %>% 
+  ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id)) +
+  geom_point() 
+```
+
+
+```{r}
+library(UpSetR); library(purrr)
+de_gs_by_k <- map(tbl_fil, "gene")
+upset(fromList(de_gs_by_k))
+```
+```{r}
+# top-5 DS genes per cluster
+pbHeatmap(sce, res, top_n = 5)
+```
+```{r}
+
+group <- factor(rep(c("fent", "sal"), each = 2))
+plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
+
+plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
+
+```
+
