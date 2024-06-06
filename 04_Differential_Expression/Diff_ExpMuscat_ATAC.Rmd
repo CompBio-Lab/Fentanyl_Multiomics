@@ -1,14 +1,14 @@
 ---
-title: "Diff_ExpMuscat_GA"
+title: "Diff_ExpMuscat_ATAC"
 output: html_document
-date: "2024-06-05"
+date: "2024-06-06"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Differential State Analysis with `muscat` (Gene Activity Counts)
+# Differential State Analysis with `muscat` (ATAC Counts)
 
 ## Load packages 
 ```{r}
@@ -26,16 +26,17 @@ library(sceasy)
 ## Load data 
 ```{r}
 # load ATAC seurat object which contains gene activity matrix in RNA assay 
-atac_ga <- readRDS(here::here("Data", "ATAC_signac.rds"))
+atac <- readRDS(here::here("Data", "ATAC_signac.rds"))
 
-# set the default assay to RNA
-DefaultAssay(atac_ga) <- "RNA"
+# set the default assay to ATAC
+DefaultAssay(atac) <- "ATAC"
 
-# remove the ATAC assay and only keep RNA 
-atac_ga[["ATAC"]] <- NULL
+# remove the RNA assay and only keep ATAC
+atac@assays[["RNA"]] <- NULL
 
 # convert to sce 
-sce <- Seurat::as.SingleCellExperiment(atac_ga)
+sce <- as.SingleCellExperiment(atac)
+dim(sce)
 ```
 
 ## Pre-processing 
@@ -118,7 +119,9 @@ pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6
 
 pb_mds <- pb_mds + 
-  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for gene activity")
+  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed")
+
+pb_mds <- pb_mds + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for ATAC")
 
 pb_mds
 ```
@@ -180,22 +183,39 @@ n_de <- vapply(tbl_fil2, nrow, numeric(1))
 p_de <- format(n_de / nrow(sce) * 100, digits = 3)
 data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
 
-top_ga <- do.call(rbind, tbl_fil2)
+# generation of top table 
+top_atac <- do.call(rbind, tbl_fil2)
 
 # plot top table 
-top_ga %>%
+top_atac %>%
   ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
   geom_point() +
   geom_text_repel() +
   theme_minimal() +
   labs(
-    title = "Volcano Plot (Gene Activity)",
+    title = "Volcano Plot (ATAC)",
     x = "Log Fold Change",
     y = "-Log10 P-value",
     color = "Cluster"
   )
 
 ```
+
+## Find the closest genes to the differentially expressed peaks 
+```{r}
+# run closest feature that gives you the closest genes using the regions from atac object 
+closest_genes <- ClosestFeature(atac, regions = granges(atac))
+
+# rename the 'gene' column to 'regions' as they are actully regions
+top_atac <- top_atac %>%
+  dplyr::rename(regions = gene)
+
+# left join query regions (from closest_genes) with regions that are differentially expressed (in differentially expressed peaks) and add the genes from the gene col into top table. 
+top_atac <- left_join(top_atac, 
+                         closest_genes %>% select(query_region, gene_name), 
+                         by = c("regions" = "query_region"))
+```
+
 
 ## Visualize results 
 ```{r}
@@ -207,25 +227,8 @@ upset(fromList(de_gs_by_k))
 
 # top-5 DS genes per cluster
 pbHeatmap(sce, res, top_n = 5)
+pbHeatmap(example_sce, res_0, top_n = 5)
 ```
-
-```{r}
-# Extract a numeric matrix from the SingleCellExperiment object
-expr_data <- assay(example_sce, "counts")  # Replace "counts" with the appropriate assay name
-
-# Check if expr_data is a numeric matrix
-if (!is.matrix(expr_data) || !is.numeric(expr_data)) {
-  stop("Expression data is not a numeric matrix")
-}
-
-# Ensure res is in the correct format
-if (!is.data.frame(res) && !is.matrix(res)) {
-  stop("Result data is not a data frame or matrix")
-}
-
-```
-
-
 
 ```{r}
 group <- factor(rep(c("fent", "sal"), each = 2))

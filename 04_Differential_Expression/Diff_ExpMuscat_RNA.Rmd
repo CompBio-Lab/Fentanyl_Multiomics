@@ -101,6 +101,10 @@ pb_mds <- pb_mds +
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6
+
+pb_mds <- pb_mds + 
+  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for RNA")
+
 pb_mds
 ```
 
@@ -164,8 +168,15 @@ top <- do.call(rbind, tbl_fil2)
 
 # plot top table 
 top %>% 
-  ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id)) +
-  geom_point()
+    ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
+  geom_point() +
+  geom_text_repel() +
+  theme_minimal() +
+  labs(
+    title = "Volcano Plot (Gene Expression)",
+    x = "Log Fold Change",
+    y = "-Log10 P-value",
+    color = "Cluster")
 
 ```
 
@@ -178,10 +189,11 @@ upset(fromList(de_gs_by_k))
 # sample level viz: Pseudobulk heatmaps
 
 # top-5 DS genes per cluster
-pbHeatmap(sce, res, top_n = 5)
+pbHeatmap(sce, res, top_n = 5, )
 ```
 
 ```{r}
+# plotting expression of one gene 
 group <- factor(rep(c("fent", "sal"), each = 2))
 plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
 
