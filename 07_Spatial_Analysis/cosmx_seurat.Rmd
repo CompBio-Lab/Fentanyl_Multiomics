@@ -1,0 +1,132 @@
+---
+title: "Cosmx_Seurat.Rmd"
+output: html_document
+date: "2024-06-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Spatial Transcriptomics (seurat pipeline)
+
+## Load libraries 
+```{r}
+library(dplyr)
+library(Seurat)
+library(SeuratObject)
+library(hdf5r)
+library(ggplot2)
+library(tidyr)
+library(fgsea)
+library(SeuratData)
+library(SeuratDisk)
+```
+
+## Load data 
+```{r}
+cosmx_eset <- read.csv(here::here("Data", "Run5618_RtBrain_tx_file.csv"))
+cosmx_demo <- read.csv(here::here("Data", "fov_annotations.csv"))
+```
+
+## create counts 
+```{r}
+cosmx_counts0 <- cosmx_eset %>% 
+  # filter(cell_ID != 0) %>% 
+  # filter(CellComp == "Nuclear") %>% 
+  mutate(cellid_fov = paste(cell_ID, fov, sep="_")) %>% 
+  dplyr::select(cellid_fov, target) %>% 
+  group_by(cellid_fov, target) %>% 
+  summarise(n = n()) %>% 
+  spread(cellid_fov, n, fill = 0)
+cosmx_counts <- as.matrix(cosmx_counts0[, -1])
+rownames(cosmx_counts) <- cosmx_counts0$target
+```
+
+## create seurat object using counts 
+```{r}
+cosmx.obj <- CreateSeuratObject(counts = cosmx_counts, assay = "RNA",
+                                 min.cells = 10, min.features = 10)
+```
+
+## Variance stablization and transformation 
+```{r}
+cosmx.obj <- SCTransform(cosmx.obj, assay = "RNA", clip.range = c(-10, 10))
+```
+
+## Perform linear dimensional reduction 
+```{r}
+# perform PCA on scaled data 
+cosmx.obj <- RunPCA(cosmx.obj, npcs = 30, features = rownames(cosmx.obj))
+```
+
+## Run non-linear dimensionality reduction (UMAP)
+```{r}
+cosmx.obj <- RunUMAP(cosmx.obj, dims = 1:30)
+```
+
+## Cluster the cells 
+```{r}
+cosmx.obj <- FindNeighbors(cosmx.obj, dims = 1:30, reduction = "pca")
+cosmx.obj <- FindClusters(cosmx.obj, resolution = 0.6)
+```
+
+## DimPlot 
+```{r}
+DimPlot(cosmx.obj, reduction = "umap")
+```
+
+## Manual annotation 
+```{r}
+#Now let's extract the top marker genes, and see which ones correspond with each cluster. This can be done using the FindAllMarkers function within Seurat.
+cosmx.obj <- PrepSCTFindMarkers(object = cosmx.obj, assay = "SCT")
+cluster_markers <- FindAllMarkers(cosmx.obj) # finds which genes are different 
+```
+
+## Fast gene set enrichment analysis 
+```{r}
+mouse_brain <- read.csv(here::here("Data", "biorxiv_mouse_brain.csv"))
+mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
+  i[-grep("ENS", i)]
+})
+names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
+mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
+
+fc <- cluster_markers$avg_log2FC
+names(fc) <- rownames(cluster_markers)
+fc_cl <- split(fc, cluster_markers$cluster)
+
+cluster_annotations <- lapply(fc_cl, function(i){
+  res <- fgsea(mbrain_genesets, i)
+  res <- res[order(res$pval),]
+  res$pathway[1]
+})
+```
+
+## Labelling clusters with cell type 
+```{r}
+Dim_plot <- DimPlot(cosmx.obj, reduction = "umap", label = F, pt.size = 0.5) + ggtitle("Spatial analysis clusters by cell type", aes(color = 1)) + theme_bw() + theme(axis.text.x = element_text(size = 14, colour = "black"), 
+axis.text.y = element_text(size = 15, colour = "black"), plot.title = element_text(size = 14, face = 
+"bold"))
+
+LabelClusters(Dim_plot, id = "ident", fontface = "bold") +
+  theme(text = element_text(size = 14, face="bold"), 
+                             legend.text = element_text(size = 10, face = 
+"bold"))
+
+```
+
+## Load GEX (and ATAC) seurat object 
+```{r}
+gex_atac <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
+```
+
+## Do cell types match between the two datasets 
+```{r}
+rna_cell <- Idents(gex_atac)
+spatial_cell <- Idents(cosmx.obj)
+
+common_cell_types <- intersect(levels(rna_cell), levels(spatial_cell))
+```
+
+
