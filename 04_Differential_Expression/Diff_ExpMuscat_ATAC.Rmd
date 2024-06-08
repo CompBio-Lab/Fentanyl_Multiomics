@@ -237,6 +237,12 @@ plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
 plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
 ```
 
+## Save top table 
+```{r}
+saveRDS(top_atac, file = here::here("Data", "top_atac.rds"))
+```
+
+
 ```{r}
 sessionInfo()
 ```

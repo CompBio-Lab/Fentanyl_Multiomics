@@ -1,0 +1,86 @@
+---
+title: "Top_table_analysis.Rmd"
+output: html_document
+date: "2024-06-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Top Table Analysis (heatmaps)
+
+## Load libraries 
+```{r}
+library(ComplexHeatmap)
+```
+
+## Load 3 top tables (gex, atac and gene activity)
+```{r}
+top_gex <- readRDS(here::here("Data", "top_gex.rds"))
+top_atac <- readRDS(here::here("Data", "top_atac.rds"))
+top_ga <- readRDS(here::here("Data", "top_ga.rds"))
+```
+
+## Heatmap showing number of up and down regulated genes within each cell type 
+```{r}
+
+```
+
+
+## Heatmap (intersection)
+```{r}
+# Define the categories
+categories <- c("Only GA", "Intersect", "Only GEX")
+
+# Group by cell type and summarize
+counts_df <- top_ga %>%
+  group_by(cluster_id) %>%
+  summarise(
+    only_ga_genes = sum(!gene %in% top_gex$gene),
+    intersect_genes = sum(gene %in% top_gex$gene)
+  ) %>%
+  ungroup()
+
+# Calculate the number of genes only in gene expression dataset for each cell type
+only_gex_genes_df <- top_gex %>%
+  group_by(cluster_id) %>%
+  summarise(
+    only_gex_genes = sum(!gene %in% top_ga$gene)
+  ) %>%
+  ungroup()
+
+# Merge the two dataframes by cluster_id
+counts_df <- left_join(counts_df, only_gex_genes_df, by = "cluster_id")
+
+# Convert the data frame to a matrix for the heatmap
+counts_matrix <- as.matrix(counts_df[, -1])
+rownames(counts_matrix) <- counts_df$cluster_id
+
+# Create the heatmap
+Heatmap(counts_matrix,
+        name = "Number of Genes",
+        row_title = "Cell Types",
+        column_title = "Gene Categories",
+        show_row_names = TRUE,
+        show_column_names = TRUE,
+        column_names_side = "bottom")
+
+```
+
+## Find the intersecting genes 
+```{r}
+# Find intersecting genes for each cell type and store in a nested column
+intersect_genes_df <- top_ga %>%
+  filter(gene %in% top_gex$gene) %>%
+  group_by(cluster_id) %>%
+  summarise(intersect_genes = list(gene)) %>%
+  ungroup()
+
+# Check the resulting dataframe
+print(intersect_genes_df)
+
+# Tanc2, Lrrfip1, Eya4 for Ex_Ebf2_Crhr2_1 
+# Tanc2 for Ex_Tfap2b_Ccdc172_Calcr
+```
+

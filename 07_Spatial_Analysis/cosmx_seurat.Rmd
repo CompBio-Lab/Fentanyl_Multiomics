@@ -86,18 +86,21 @@ cluster_markers <- FindAllMarkers(cosmx.obj) # finds which genes are different
 ## Fast gene set enrichment analysis 
 ```{r}
 mouse_brain <- read.csv(here::here("Data", "biorxiv_mouse_brain.csv"))
-mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
-  i[-grep("ENS", i)]
-})
-names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
-mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
+#mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
+  #i[-grep("ENS", i)]})
+
+mbrain_genesets_new <- split(cluster_markers$gene, cluster_markers$cluster)
+names(mbrain_genesets_new) <- unique(cluster_markers$cluster)
+
+#names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
+#mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
 
 fc <- cluster_markers$avg_log2FC
 names(fc) <- rownames(cluster_markers)
 fc_cl <- split(fc, cluster_markers$cluster)
 
 cluster_annotations <- lapply(fc_cl, function(i){
-  res <- fgsea(mbrain_genesets, i)
+  res <- fgsea(mbrain_genesets_new, i)
   res <- res[order(res$pval),]
   res$pathway[1]
 })

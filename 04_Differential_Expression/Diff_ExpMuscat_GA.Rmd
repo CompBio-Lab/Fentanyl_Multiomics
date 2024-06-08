@@ -112,13 +112,15 @@ t(head(assay(pb)))
 # use very distinctive shaping of groups & change cluster colors
 pb_mds <- pb_mds + 
   scale_shape_manual(values = c(17, 4)) +
-  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(6, "Set2"), RColorBrewer::brewer.pal(3, "Set3")))
+  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(6, "Set2"), RColorBrewer::brewer.pal(3, "Set3"))) 
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6
 
+pb_mds <- pb_mds + geom_text(aes(label = cluster_id))
+
 pb_mds <- pb_mds + 
-  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for gene activity")
+  geom_line(aes(group = cluster_id), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for gene activity")
 
 pb_mds
 ```
@@ -209,29 +211,17 @@ upset(fromList(de_gs_by_k))
 pbHeatmap(sce, res, top_n = 5)
 ```
 
-```{r}
-# Extract a numeric matrix from the SingleCellExperiment object
-expr_data <- assay(example_sce, "counts")  # Replace "counts" with the appropriate assay name
-
-# Check if expr_data is a numeric matrix
-if (!is.matrix(expr_data) || !is.numeric(expr_data)) {
-  stop("Expression data is not a numeric matrix")
-}
-
-# Ensure res is in the correct format
-if (!is.data.frame(res) && !is.matrix(res)) {
-  stop("Result data is not a data frame or matrix")
-}
-
-```
-
-
 
 ```{r}
 group <- factor(rep(c("fent", "sal"), each = 2))
 plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
 
 plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
+```
+
+## Save top table 
+```{r}
+saveRDS(top_ga, file = here::here("Data", "top_ga.rds"))
 ```
 
 ```{r}

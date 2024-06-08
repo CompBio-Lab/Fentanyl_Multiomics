@@ -25,7 +25,6 @@ library(UpSetR)
 ## Load data 
 ```{r}
 sce <- Seurat::as.SingleCellExperiment(readRDS(here::here("Data", "GEX_ATAC_Seur.rds")))
-
 dim(sce)
 ```
 
@@ -198,6 +197,11 @@ group <- factor(rep(c("fent", "sal"), each = 2))
 plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
 
 plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
+```
+
+## Save top table 
+```{r}
+saveRDS(top, file = here::here("Data", "top_gex.rds"))
 ```
 
 ```{r}
