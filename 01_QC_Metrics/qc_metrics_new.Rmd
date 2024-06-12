@@ -1,0 +1,211 @@
+---
+title: "qc_metrics_new"
+output: html_document
+date: "2024-06-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# QC Metrics for Multiomics Data (GEX and ATAC)
+
+## Load libraries 
+```{r}
+library(dplyr)
+library(Seurat)
+library(SeuratObject)
+library(hdf5r)
+library(SeuratData)
+library(SeuratDisk)
+library(EnsDb.Rnorvegicus.v75)
+library(GenomicRanges)
+library(Signac)
+library(here)
+```
+
+## Load h5 files 
+```{r}
+r3counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R3.h5"))
+r4counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R4.h5"))
+r15counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R15.h5"))
+r16counts <- Read10X_h5(here::here("Data", "filtered_feature_bc_matrix_R16.h5"))
+```
+
+## Create GEX seurat object 
+```{r}
+r3_RNA <- CreateSeuratObject(counts = r3counts$`Gene Expression`, assay = "RNA")
+r4_RNA <- CreateSeuratObject(counts = r4counts$`Gene Expression`, assay = "RNA")
+r15_RNA <- CreateSeuratObject(counts = r15counts$`Gene Expression`, assay = "RNA")
+r16_RNA <- CreateSeuratObject(counts = r16counts$`Gene Expression`, assay = "RNA")
+Idents(r3_RNA) <- "r3"
+Idents(r4_RNA) <- "r4"
+Idents(r15_RNA) <- "r15"
+Idents(r16_RNA) <- "r16"
+
+#orig.ident needs to be re-labelled as sample name as it changes to "SeuratProject" 
+r3_RNA@meta.data$orig.ident <- factor('r3')
+r4_RNA@meta.data$orig.ident <- factor('r4')
+r15_RNA@meta.data$orig.ident <- factor('r15')
+r16_RNA@meta.data$orig.ident <- factor('r16')
+
+#Merging the Seurat objects
+rna <- merge(r3_RNA, y = c(r4_RNA, r15_RNA, r16_RNA), add.cell.ids = c("r3", "r4", "r15", 
+"r16"), project = "RNA")
+
+# Join RNA count layers 
+rna[["RNA"]] <- JoinLayers(rna[["RNA"]])
+```
+
+## Create ATAC seurat object 
+```{r}
+# Load atac data 
+r3counts_peaks <- r3counts$Peaks
+r4counts_peaks <- r4counts$Peaks
+r15counts_peaks <- r15counts$Peaks
+r16counts_peaks <- r16counts$Peaks
+
+annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Rnorvegicus.v75)
+seqlevelsStyle(annotations) <- 'UCSC'
+
+# Create chromatinassay objects 
+#Chromatin assay for R3 
+chrom_assay_R3 <- CreateChromatinAssay(
+  counts = r3counts_peaks,
+  sep = c(":", "-"),
+  fragments = here::here("Data", "atac_fragments", "atac_fragments_R3.tsv.gz"),
+  min.cells = 10, 
+  min.features = 200,
+  annotation = annotations 
+)
+
+#meta-data for R3 
+metadata_R3 <- read.csv(here::here("Data", "atac_fragments", "per_barcode_metrics_R3.csv"))
+
+#Chromatin assay for R4 
+chrom_assay_R4 <- CreateChromatinAssay(
+  counts = r4counts_peaks,
+  sep = c(":", "-"),
+  fragments = here::here("Data", "atac_fragments", "atac_fragments_R4.tsv.gz"),
+  min.cells = 10, 
+  min.features = 200,
+  annotation = annotations 
+)
+
+#meta-data for R4 
+metadata_R4 <- read.csv(here::here("Data", "atac_fragments", "per_barcode_metrics_R4.csv"))
+
+#chromatin assay for R15 
+chrom_assay_R15 <- CreateChromatinAssay(
+  counts = r15counts_peaks,
+  sep = c(":", "-"),
+  fragments = here::here("Data", "atac_fragments", "atac_fragments_R15.tsv.gz"),
+  min.cells = 10, 
+  min.features = 200,
+  annotation = annotations 
+)
+
+#meta-data for R15 
+metadata_R15 <- read.csv(here::here("Data", "atac_fragments", "per_barcode_metrics_R15.csv"))
+
+#chromatin assay for R16 
+chrom_assay_R16 <- CreateChromatinAssay(
+  counts = r16counts_peaks,
+  sep = c(":", "-"),
+  fragments = here::here("Data", "atac_fragments", "atac_fragments_R16.tsv.gz"),
+  min.cells = 10, 
+  min.features = 200,
+  annotation = annotations 
+)
+
+#meta-data for R16 
+metadata_R16 <- read.csv(here::here("Data", "atac_fragments", "per_barcode_metrics_R16.csv"))
+
+
+```
+
+```{r}
+R3_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R3,
+  meta.data = metadata_R3,
+  assay = "ATAC"
+)
+
+R4_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R4,
+  meta.data = metadata_R4,
+  assay = "ATAC"
+)
+
+R15_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R15,
+  meta.data = metadata_R15,
+  assay = "ATAC"
+)
+
+R16_seur_peaks <- CreateSeuratObject(
+  counts = chrom_assay_R16,
+  meta.data = metadata_R16,
+  assay = "ATAC"
+)
+
+
+# orig.ident in meta-data and active.ident needs to be re-labelled from "SeuratProject" to sample name
+R3_seur_peaks@meta.data$orig.ident <- factor("r3")
+R4_seur_peaks@meta.data$orig.ident <- factor("r4")
+R15_seur_peaks@meta.data$orig.ident <- factor("r15")
+R16_seur_peaks@meta.data$orig.ident <- factor("r16")
+
+levels(R3_seur_peaks@active.ident) <- "r3"
+levels(R4_seur_peaks@active.ident) <- "r4"
+levels(R15_seur_peaks@active.ident) <- "r15"
+levels(R16_seur_peaks@active.ident) <- "r16"
+
+atac <- merge(
+  x = R3_seur_peaks,
+  y = c(R4_seur_peaks, R15_seur_peaks, R16_seur_peaks), add.cell.ids = c("r3", "r4", "r15", 
+"r16")
+)
+```
+
+## Add ATAC to GEX seurat object 
+```{r}
+rna[["ATAC"]] <- atac[["ATAC"]]
+```
+
+## Quality control for seurat object containing both assays 
+```{r}
+# Number of nuclei in each sample before filtering 
+before_filter <- table(Idents(rna))
+
+# Step 1: Obtain percentage of mitochondrial genes (rna) and store it in meta-data as well as nucleosome signal and TSS enrichement score (atac)
+rna[["percent.mt"]] <- PercentageFeatureSet(rna, pattern = "^Mt-")
+
+DefaultAssay(rna) <- "ATAC"  
+
+rna <- NucleosomeSignal(rna)
+rna <- TSSEnrichment(object = rna)
+
+# Step 2: Visualize violin plot of nFeature_ATAC, nFeature_RNA, and percent.mt 
+VlnPlot(rna, features = c("nFeature_RNA", "nFeature_ATAC", "percent.mt", "TSS.enrichment", "nucleosome_signal"), ncol = 5)
+
+# Step 3: Remove cells that have less than 100 features (potential empty droplet) and more than 7500 features (potential doublet) as well as cells that have more than 15% of mitochondrial genes 
+rna <- subset(
+  rna, 
+  subset = nFeature_RNA > 100 &
+    nFeature_RNA < 7500 &
+    percent.mt < 15 & 
+    nCount_ATAC > 100 &
+    nCount_ATAC < 400000 &
+    nucleosome_signal < 5 &
+    TSS.enrichment > 0.5
+  )
+
+```
+
+## Save Seurat object 
+```{r}
+saveRDS(rna, file = here::here("Data", "GEX_ATAC.rds"))
+```
+
+

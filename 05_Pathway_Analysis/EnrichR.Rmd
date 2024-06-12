@@ -18,21 +18,16 @@ top <- readRDS(here::here("Data", "top_gex.rds"))
 
 ## Filtering top table 
 ```{r}
-# filter by comparison 
-top_dxs <- top[top$comparison == "drug x sex interaction", ]
-
 # filter by adj p.value 
-top_dxs <- top_dxs[top_dxs$adj.P.Val < 0.01, ]
+top <- top[top$p_adj.loc < 0.3, ]
 
 # filter by cell type 
-Endo_Flt1_Lrg1_1 <- top_dxs[top_dxs$cell == "Endo_Flt1_Lrg1_1", ]
-Ex_C1ql4 <- top_dxs[top_dxs$cell == "Ex_C1ql4_Drd1_3", ]
-Ex_Ebf2 <- top_dxs[top_dxs$cell == "Ex_Ebf2_Layn", ]
-Ex_Plekhg1 <- top_dxs[top_dxs$cell == "Ex_Plekhg1_Nox4_Kcp_2", ]
-Ex_Sim1 <- top_dxs[top_dxs$cell == "Ex_Sim1_Aox3_1", ]
-Ex_Tfap2b <- top_dxs[top_dxs$cell == "Ex_Tfap2b_Ccdc172_Calcr", ]
-Fibro_Eya2 <- top_dxs[top_dxs$cell == "Fibro_Eya2_Ccdc192_2", ]
-Inh_Frm7 <- top_dxs[top_dxs$cell == "Inh_Frm7_Otop1_1", ]
+Ex_C1ql4 <- top[top$cluster_id == "Ex_C1ql4_Drd1_3", ]
+Ex_Plekhg1 <- top[top$cluster_id == "Ex_Plekhg1_Nox4_Kcp_2", ]
+Ex_Fibcd1 <- top[top$cluster_id == "Ex_Fibcd1_Psrc1_4", ]
+Ex_Tfap2b <- top[top$cluster_id == "Ex_Tfap2b_Ccdc172_Calcr", ]
+Fibro_Eya2 <- top[top$cluster_id == "Fibro_Eya2_Ccdc192_2", ]
+Inh_Frm7 <- top[top$cluster_id == "Inh_Frm7_Otop1_1", ]
 ```
 
 ## Load enrichR library 
@@ -56,11 +51,9 @@ dbs <- c("Allen_Brain_Atlas_10x_scRNA_2021", "KEGG_2019_Mouse", "RNAseq_Automati
 
 #Run enrichR for each cell type 
 
-enriched_Endo_Flt1_Lrg1_1 <- enrichr(Endo_Flt1_Lrg1_1$gene, dbs)
 enriched_Ex_C1ql4 <- enrichr(Ex_C1ql4$gene, dbs)
-enriched_Ex_Ebf2 <- enrichr(Ex_Ebf2$gene, dbs)
+enriched_Ex_Fibcd1 <- enrichr(Ex_Fibcd1$gene, dbs)
 enriched_Ex_Plekhg1 <- enrichr(Ex_Plekhg1$gene, dbs)
-enriched_Ex_Sim1 <- enrichr(Ex_Sim1$gene, dbs)
 enriched_Ex_Tfap2b <- enrichr(Ex_Tfap2b$gene, dbs)
 enriched_Fibro_Eya2 <- enrichr(Fibro_Eya2$gene, dbs)
 enriched_Inh_Frm7 <- enrichr(Inh_Frm7$gene, dbs)
@@ -70,7 +63,7 @@ enriched_Inh_Frm7 <- enrichr(Inh_Frm7$gene, dbs)
 ## Plot enrichR output 
 ```{r}
 if (websiteLive) {
-    plotEnrich(enriched_Ex_C1ql4[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+    plotEnrich(enriched_Ex_Tfap2b[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
 }
 ```
 

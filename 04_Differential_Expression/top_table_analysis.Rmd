@@ -13,6 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Load libraries 
 ```{r}
 library(ComplexHeatmap)
+library(dplyr)
+library(circlize)
+library(mixOmics) 
 ```
 
 ## Load 3 top tables (gex, atac and gene activity)
@@ -22,40 +25,164 @@ top_atac <- readRDS(here::here("Data", "top_atac.rds"))
 top_ga <- readRDS(here::here("Data", "top_ga.rds"))
 ```
 
-## Heatmap showing number of up and down regulated genes within each cell type 
+## Getting counts for each dataset 
 ```{r}
+#GEX counts 
+top_gex <- top_gex %>% filter(p_adj.loc < 0.25)
+
+# Process GEX dataset
+df_gex <- top_gex %>%
+  mutate(dataset = "gex") %>%
+  select(cluster_id, dataset, logFC) %>%
+  mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
+
+gene_counts <- df_gex %>%
+  group_by(cluster_id, regulation) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
+  mutate(dataset = "gex")
+
+# ATAC Counts 
+top_atac <- top_atac %>% filter(p_adj.loc < 0.25)
+
+# Process ATAC dataset
+df_atac <- top_atac %>%
+  mutate(dataset = "atac") %>%
+  select(cluster_id, dataset, logFC) %>%
+  mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
+
+atac_counts <- df_atac %>%
+  group_by(cluster_id, regulation) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
+  mutate(dataset = "atac")
+  
+# GA Counts 
+top_ga <- top_ga %>% filter(p_adj.loc < 0.50)
+
+# Process GA dataset
+df_ga <- top_ga %>%
+  mutate(dataset = "ga") %>%
+  select(cluster_id, dataset, logFC) %>%
+  mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
+
+ga_counts <- df_ga %>%
+  group_by(cluster_id, regulation) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
+  mutate(dataset = "ga")
 
 ```
 
+## Plotting heatmap showing number of genes that are up- and down-regulated for each cell type within the three datasets
+```{r}
 
-## Heatmap (intersection)
+# Combine datasets and ensure correct aggregation
+combined_counts <- bind_rows(gene_counts, atac_counts, ga_counts)
+
+# Aggregate counts to avoid duplicates
+aggregated_counts <- combined_counts %>%
+  pivot_longer(cols = c(UP, DOWN), names_to = "FC", values_to = "count") %>%
+  mutate(count = ifelse(FC == "DOWN", -count, count)) %>%  # Convert DOWN counts to negative
+  group_by(cluster_id, dataset, FC) %>%
+  summarise(count = sum(count, na.rm = TRUE)) %>%  # Aggregate counts
+  pivot_wider(names_from = dataset, values_from = count, values_fill = 0)
+
+# Convert to matrix
+heatmap_matrix <- as.matrix(aggregated_counts[, -c(1, 2)])  # Exclude cluster_id and FC for the matrix
+rownames(heatmap_matrix) <- paste(aggregated_counts$cluster_id, aggregated_counts$FC, sep = "_")
+
+# Define color palette for counts
+col_fun <- colorRamp2(c(-max(abs(heatmap_matrix), na.rm = TRUE), 0, max(abs(heatmap_matrix), na.rm = TRUE)), c("lightblue", "white", "salmon"))
+
+# Define unique colors for each cluster_id
+cluster_ids <- unique(aggregated_counts$cluster_id)
+cluster_colors <- setNames(rainbow(length(cluster_ids)), cluster_ids)
+
+# Define row annotation colors for cluster_id and FC
+row_ha = rowAnnotation(
+  Cluster = factor(aggregated_counts$cluster_id),
+  FC = factor(aggregated_counts$FC),
+  col = list(Cluster = cluster_colors, FC = c("UP" = "salmon", "DOWN" = "lightblue"))
+)
+
+# Create heatmap for counts
+Heatmap(
+  heatmap_matrix,
+  name = "Counts",
+  col = col_fun,
+  right_annotation = row_ha,
+  cluster_rows = FALSE,
+  show_row_names = FALSE,  # Remove row names
+  show_column_names = TRUE,
+  row_names_side = "left",
+  column_names_side = "bottom",
+  cell_fun = function(j, i, x, y, width, height, fill) {
+    grid.text(sprintf("%.1f", heatmap_matrix[i, j]), x, y, gp = gpar(fontsize = 10))  # Ensure numeric values
+  }
+)
+
+
+
+```
+
+## Heatmap (intersection of genes)
 ```{r}
 # Define the categories
 categories <- c("Only GA", "Intersect", "Only GEX")
 
-# Group by cell type and summarize
-counts_df <- top_ga %>%
+# Create a combined list of all cell types
+all_cell_types <- union(unique(top_gex$cluster_id), unique(top_ga$cluster_id))
+
+# Create a dataframe with all cell types and initialize counts to zero
+counts_df <- data.frame(
+  cluster_id = all_cell_types,
+  only_gex_genes = 0,
+  intersect_genes = 0,
+  only_ga_genes = 0
+)
+
+# Calculate the counts for each cell type present in top_gex
+counts_gex <- top_gex %>%
   group_by(cluster_id) %>%
   summarise(
-    only_ga_genes = sum(!gene %in% top_gex$gene),
-    intersect_genes = sum(gene %in% top_gex$gene)
+    only_gex_genes = sum(!gene %in% top_ga$gene),  # Comparing with top_ga
+    intersect_genes = sum(gene %in% top_ga$gene)   # Intersecting with top_ga
   ) %>%
   ungroup()
 
-# Calculate the number of genes only in gene expression dataset for each cell type
-only_gex_genes_df <- top_gex %>%
+# Calculate the counts for each cell type present in top_ga
+counts_ga <- top_ga %>%
   group_by(cluster_id) %>%
   summarise(
-    only_gex_genes = sum(!gene %in% top_ga$gene)
+    only_ga_genes = sum(!gene %in% top_gex$gene),   # Comparing with top_gex
+    intersect_genes = sum(gene %in% top_gex$gene)   # Intersecting with top_gex
   ) %>%
   ungroup()
 
-# Merge the two dataframes by cluster_id
-counts_df <- left_join(counts_df, only_gex_genes_df, by = "cluster_id")
+# Merge the counts into the dataframe with all cell types
+counts_df <- left_join(counts_df, counts_gex, by = "cluster_id", suffix = c("", "_gex"))
+counts_df <- left_join(counts_df, counts_ga, by = "cluster_id", suffix = c("", "_ga"))
 
-# Convert the data frame to a matrix for the heatmap
+# Replace NA values with 0
+counts_df[is.na(counts_df)] <- 0
+
+# Adjust the column names
+counts_df <- counts_df %>%
+  mutate(
+    intersect_genes = intersect_genes_gex + intersect_genes_ga,  # Combine intersect counts
+    only_gex_genes = only_gex_genes + only_gex_genes_gex,        # Combine only_gex counts
+    only_ga_genes = only_ga_genes + only_ga_genes_ga             # Combine only_ga counts
+  ) %>%
+  select(cluster_id, only_gex_genes, intersect_genes, only_ga_genes)
+
+# Convert to matrix
 counts_matrix <- as.matrix(counts_df[, -1])
 rownames(counts_matrix) <- counts_df$cluster_id
+
+# Print counts_gex and counts_ga to check if counts are being calculated correctly
+print(counts_gex)
+print(counts_ga)
 
 # Create the heatmap
 Heatmap(counts_matrix,
@@ -65,6 +192,7 @@ Heatmap(counts_matrix,
         show_row_names = TRUE,
         show_column_names = TRUE,
         column_names_side = "bottom")
+
 
 ```
 
@@ -80,7 +208,7 @@ intersect_genes_df <- top_ga %>%
 # Check the resulting dataframe
 print(intersect_genes_df)
 
-# Tanc2, Lrrfip1, Eya4 for Ex_Ebf2_Crhr2_1 
+# Tanc2, Lrrfip1 for Ex_Ebf2_Crhr2_1 
 # Tanc2 for Ex_Tfap2b_Ccdc172_Calcr
 ```
 
