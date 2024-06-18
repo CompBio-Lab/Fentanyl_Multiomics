@@ -48,8 +48,12 @@ GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, l
 # v5 of seurat makes the RNA assay at assayv5 but if you need to convert to anndata for sccoda it needs to be "assay" and not assayv5 hence run: 
 GEX_ATAC_seur@assays$RNA <- as(object = GEX_ATAC_seur@assays$RNA, Class = "Assay")
 
+
 # Save object as h5ad for input into sccoda 
 SaveH5Seurat(GEX_ATAC_seur, filename = here::here("Data", "GEX_ATAC_scCODA.h5Seurat"))
 Convert(here::here("Data", "GEX_ATAC_scCODA.h5Seurat"), dest = "h5ad", overwrite = TRUE)
+
+# Save gex_atac as rds 
+saveRDS(GEX_ATAC_seur, file = here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
