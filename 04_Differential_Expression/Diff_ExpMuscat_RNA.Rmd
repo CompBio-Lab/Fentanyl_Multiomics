@@ -58,7 +58,7 @@ assays(sce)$vstresiduals <- vst(counts(sce), verbosity = FALSE)$y
 ```{r}
 sce$id <- paste0(sce$drug, sce$orig.ident)
 (sce <- prepSCE(sce, 
-    kid = "celltype", # subpopulation assignments
+    kid = "aba_classification", # subpopulation assignments
     gid = "drug",  # group IDs (ctrl/stim)
     sid = "id",   # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
@@ -95,8 +95,8 @@ t(head(assay(pb)))
 
 # use very distinctive shaping of groups & change cluster colors
 pb_mds <- pb_mds + 
-  scale_shape_manual(values = c(17, 4)) +
-  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(6, "Set2"), RColorBrewer::brewer.pal(3, "Set3")))
+  scale_shape_manual(values = c(21, 4)) +
+  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(7, "Set2"), RColorBrewer::brewer.pal(6, "Set3")))
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6

@@ -30,27 +30,26 @@ GEX_ATAC_seur <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 
 # Add meta data to run scCODA analysis
 ```{r}
-demo_10x <- data_frame(ids = c("r3", "r4", "r15", "r16"),
-                       condition = c("saline", "fentanyl", "fentanyl", "saline"), 
-                       sex = c("Male", "Male", "Female", "Female"))
-
-GEX_ATAC_seur@meta.data <- left_join(GEX_ATAC_seur@meta.data, demo_10x, by = c("orig.ident" = "ids"))
 
 # Create a column in metadata called SampleID with same info as orig.ident 
 GEX_ATAC_seur@meta.data$SampleID <- GEX_ATAC_seur@meta.data$orig.ident
 
 # Create a column in metadata called cell_type with cell types in cluster_annotations (csv can be found in clustering_and_annotation folder) 
 
-cell_types <- c("Inh_Gata3_Ccdc180_2","Ex_Ebf2_Fzd9_3","Ex_C1ql4_Drd1_3","Ex_Onecut3_Spag16_3","Ex_Fbxo40_Kcnk5_1","Fibro_Eya2_Ccdc192_2","Ex_C1ql4_Prdm6","Ex_Plekhg1_Nox4_Kcp_2","Inh_Frm7_Otop1_1","Ex_Ebf2_Layn","Ex_Tfap2b_Ccdc172_Calcr","Endo_Flt1_Lrg1_1","Endo_Flt1_Ssu2_1","Ex_Fibcd1_Psrc1_4","Ex_Crym_Odad2_Fos","Ex_Sim1_Aox3_1","Ex_Ebf2_Crhr2_1")
+cell_types <- c("CB Granule Glut","Oligo NN", "PGRN-PARN-MDRN Hoxb5 Glut", "Endo NN", "Bergmann NN", "Astro-CB NN", "CB PLI Gly-Gaba", "CBX MLI Megf11 Gaba", "SPVI-SPVC Sall3 Nfib Gly-Gaba", "SPVI-SPVC Tlx3 Ebf3 Glut", "Astro-NT NN", "CBX MLI Cdh22 Gaba", "VLMC NN", "OPC NN", "PG-TRN-LRN Fat2 Glut", "PARN-MDRNd-NTS Gbx2 Gly-Gaba", "MY Lhx1 Gly-Gaba",  "SPVI-SPVC Sall3 Lhx1 Gly-Gaba", "DCO UBC Glut",  "CBX Purkinje Gaba" , "CBX Golgi Gly-Gaba")
 
 GEX_ATAC_seur@meta.data$cell_type <- NA
 GEX_ATAC_seur@meta.data$cell_type <- factor(GEX_ATAC_seur@meta.data$cell_type, levels = cell_types)
+
 ```
 
 # Save seurat object as h5ad for sccoda analysis in python 
 ```{r}
+# v5 of seurat makes the RNA assay at assayv5 but if you need to convert to anndata for sccoda it needs to be "assay" and not assayv5 hence run: 
+GEX_ATAC_seur@assays$RNA <- as(object = GEX_ATAC_seur@assays$RNA, Class = "Assay")
+
 # Save object as h5ad for input into sccoda 
 SaveH5Seurat(GEX_ATAC_seur, filename = here::here("Data", "GEX_ATAC_scCODA.h5Seurat"))
-Convert(here::here("Data", "GEX_ATAC_scCODA.h5Seurat", dest = "h5ad"))
+Convert(here::here("Data", "GEX_ATAC_scCODA.h5Seurat"), dest = "h5ad", overwrite = TRUE)
 ```
 

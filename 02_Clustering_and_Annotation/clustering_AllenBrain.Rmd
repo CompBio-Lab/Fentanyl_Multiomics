@@ -1,0 +1,170 @@
+---
+title: "clustering_scBrainMap"
+output: html_document
+date: "2024-06-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Weightned Nearest Neighbor Analysis of 10x Multiome 
+
+## Load libraries 
+```{r}
+library(Signac)
+library(Seurat)
+library(tidyverse)
+library(ggrepel)
+library(GenomicRanges)
+library(future)
+library(reticulate)
+library(anndata)
+
+future::plan("multisession", workers = 4)
+options(future.globals.maxSize = 50000 * 1024^2) # for 50 Gb RAM
+
+set.seed(1234)
+```
+
+## Load data 
+```{r}
+rna_atac <- readRDS(here::here("Data", "GEX_ATAC.rds"))
+```
+
+
+## RNA Analysis
+```{r}
+DefaultAssay(rna_atac) <- "RNA"
+rna_atac <- SCTransform(rna_atac, vars.to.regress = "percent.mt", verbose = FALSE) %>% RunPCA() %>% RunUMAP(dims = 1:50, reduction.name = 'umap.rna', reduction.key = 'rnaUMAP_')
+```
+
+## ATAC Analysis 
+```{r}
+# We exclude the first dimension as this is typically correlated with sequencing depth
+DefaultAssay(rna_atac) <- "ATAC"
+rna_atac <- RunTFIDF(rna_atac)
+rna_atac <- FindTopFeatures(rna_atac, min.cutoff = 'q0')
+rna_atac <- RunSVD(rna_atac)
+rna_atac <- RunUMAP(rna_atac, reduction = 'lsi', dims = 2:50, reduction.name = "umap.atac", reduction.key = "atacUMAP_")
+```
+
+## Calculate WNN graph, representing weighted combination of RNA and ATAC-seq modalities 
+```{r}
+rna_atac <- FindMultiModalNeighbors(rna_atac, reduction.list = list("pca", "lsi"), dims.list = list(1:50, 2:50))
+rna_atac <- RunUMAP(rna_atac, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+rna_atac <- FindClusters(rna_atac, graph.name = "wsnn", algorithm = 3, verbose = FALSE, resolution = 0.01)
+```
+
+## Visualize clustering 
+```{r}
+p1 <- DimPlot(rna_atac, reduction = "umap.rna", label = TRUE, label.size = 2.5, repel = TRUE) + ggtitle("RNA")
+p2 <- DimPlot(rna_atac, reduction = "umap.atac", label = TRUE, label.size = 2.5, repel = TRUE) + ggtitle("ATAC")
+p3 <- DimPlot(rna_atac, reduction = "wnn.umap", label = TRUE, label.size = 2.5, repel = TRUE) + ggtitle("WNN")
+p1 + p2 + p3 & NoLegend() & theme(plot.title = element_text(hjust = 0.5))
+```
+
+# Annotate using MapMyCells - Allen Brain Institute
+
+ - https://knowledge.brain-map.org/mapmycells/process
+ - parameters: 10x mouse brain, hierarchical mapping
+ 
+## download celltype annotation taxonomy: https://portal.brain-map.org/explore/cell-type-references-and-algorithms
+
+## Save corrected counts to h5ad 
+```{r}
+use_condaenv(condaenv = '/Users/rishikadaswani/anaconda3/envs/cellanno', required = TRUE)
+
+minimal_adata <- t(rna_atac@assays$SCT$counts)
+ad <- AnnData(
+   X = minimal_adata,
+   obs = data.frame(group = rownames(minimal_adata), row.names = rownames(minimal_adata)),
+   var = data.frame(type = colnames(minimal_adata), row.names = colnames(minimal_adata))
+ )
+
+ write_h5ad(ad,here::here("Data", "rna_fent_counts.h5ad"), compression='gzip')
+
+```
+
+## The h5ad file gets inputted into the https://knowledge.brain-map.org/mapmycells/process
+
+```{r}
+# load output from above 
+cellann0 <- read.csv(here::here("Data","rna_fent_counts_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1718659866135", "rna_fent_counts_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1718659866135.csv"), header = FALSE)
+cellann <- cellann0[-c(1:5), ]
+colnames(cellann) <- as.character(cellann0[5,])
+
+subclass <- na.omit(readxl::read_xlsx(here::here("Data", "cl.df_CCN202307220.xlsx"), sheet = "subclass_annotation"))
+row.names(subclass) <- subclass$cell_set_accession.subclass
+cc <- subclass[cellann$subclass_label, "subclass_label"]
+rownames(cc) <- cellann$cell_id
+
+# added the comma because you want to match rownmaes of cc with colnames of rna_atac
+rna_atac@meta.data$aba_classification = cc[colnames(rna_atac) , ] 
+```
+
+## overlap between clusters and labels
+ 
+```{r}
+library(ComplexHeatmap)
+overlap <- table(rna_atac$aba_classification, rna_atac$seurat_clusters)
+Heatmap(overlap/rowSums(overlap),
+        cell_fun = function(j, i, x, y, w, h, col) { # add text to each grid
+        grid.text(overlap[i, j], x, y)
+    })
+```
+
+
+## remove cluters with very few cells
+
+```{r}
+aba_cellann <- rna_atac$aba_classification %>% table()
+celltypes_more20 <- aba_cellann[aba_cellann > 20] |> names()
+
+keep_cellann <- rna_atac@meta.data %>%
+                filter(aba_classification$subclass_label %in% more_20_celltypes)
+
+rna_atac <- subset(rna_atac, cells = rownames(keep_cellann))
+overlap <- table(rna_atac$aba_classification, rna_atac$seurat_clusters)
+Heatmap(overlap/rowSums(overlap),
+        cell_fun = function(j, i, x, y, w, h, col) { # add text to each grid
+        grid.text(overlap[i, j], x, y)
+    })
+```
+
+## Find Markers 
+```{r}
+Idents(object = rna_atac) <- "aba_classification"
+DefaultAssay(rna_atac) <- "RNA"
+rna_atac <- PrepSCTFindMarkers(object = rna_atac)
+markers <- FindAllMarkers(rna_atac,
+                          assay = "SCT",
+                          logfc.threshold = 0.1, 
+                          only.pos = TRUE,
+                          min.pct=0.1,
+                          recorrect_umi=FALSE)
+markers <- markers %>% 
+  group_by(cluster) %>% 
+  dplyr::slice(1:2)
+table(markers$cluster)
+
+DoHeatmap(rna_atac, features = markers$gene, assay = "SCT") + NoLegend()
+```
+
+## labelled DimPlots 
+```{r}
+label.size <- 4
+p1 <- DimPlot(rna_atac, reduction = "umap.rna", label = TRUE, label.size = label.size, repel = TRUE) + ggtitle("RNA")
+p2 <- DimPlot(rna_atac, reduction = "umap.atac", label = TRUE, label.size = label.size, repel = TRUE) + ggtitle("ATAC")
+p3 <- DimPlot(rna_atac, reduction = "wnn.umap", label = TRUE, label.size = label.size, repel = TRUE) + ggtitle("WNN")
+p1 + p2 + p3 & NoLegend () & theme(plot.title = element_text(hjust = 0.5), legend.text = element_text(size = 14, face = "bold"))
+
+
+```
+
+## Save labelled seurat object 
+```{r}
+saveRDS(rna_atac, file = here::here("Data", "GEX_ATAC_Seur.rds"))
+```
+
+

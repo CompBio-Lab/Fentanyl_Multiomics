@@ -50,11 +50,11 @@ r15_RNA@meta.data$orig.ident <- factor('r15')
 r16_RNA@meta.data$orig.ident <- factor('r16')
 
 #Merging the Seurat objects
-rna <- merge(r3_RNA, y = c(r4_RNA, r15_RNA, r16_RNA), add.cell.ids = c("r3", "r4", "r15", 
+rna_atac <- merge(r3_RNA, y = c(r4_RNA, r15_RNA, r16_RNA), add.cell.ids = c("r3", "r4", "r15", 
 "r16"), project = "RNA")
 
 # Join RNA count layers 
-rna[["RNA"]] <- JoinLayers(rna[["RNA"]])
+rna_atac[["RNA"]] <- JoinLayers(rna_atac[["RNA"]])
 ```
 
 ## Create ATAC seurat object 
@@ -66,7 +66,7 @@ r15counts_peaks <- r15counts$Peaks
 r16counts_peaks <- r16counts$Peaks
 
 annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Rnorvegicus.v75)
-seqlevelsStyle(annotations) <- 'UCSC'
+genome(annotations) <- "Rnor_5.0"
 
 # Create chromatinassay objects 
 #Chromatin assay for R3 
@@ -170,36 +170,52 @@ atac <- merge(
 
 ## Add ATAC to GEX seurat object 
 ```{r}
-rna[["ATAC"]] <- atac[["ATAC"]]
+rna_atac[["ATAC"]] <- atac[["ATAC"]]
 ```
 
 ## Quality control for seurat object containing both assays 
 ```{r}
 # Number of nuclei in each sample before filtering 
-before_filter <- table(Idents(rna))
+before_filter <- table(Idents(rna_atac))
 
-# Step 1: Obtain percentage of mitochondrial genes (rna) and store it in meta-data as well as nucleosome signal and TSS enrichement score (atac)
-rna[["percent.mt"]] <- PercentageFeatureSet(rna, pattern = "^Mt-")
+# Step 1: Obtain percentage of mitochondrial genes (rna_atac) and store it in meta-data as well as nucleosome signal and TSS enrichement score (atac)
+rna_atac[["percent.mt"]] <- PercentageFeatureSet(rna_atac, pattern = "^Mt-")
 
-DefaultAssay(rna) <- "ATAC"  
+DefaultAssay(rna_atac) <- "ATAC"  
 
-rna <- NucleosomeSignal(rna)
-rna <- TSSEnrichment(object = rna)
+rna_atac <- NucleosomeSignal(rna_atac)
+rna_atac <- TSSEnrichment(object = rna_atac)
 
 # Step 2: Visualize violin plot of nFeature_ATAC, nFeature_RNA, and percent.mt 
-VlnPlot(rna, features = c("nFeature_RNA", "nFeature_ATAC", "percent.mt", "TSS.enrichment", "nucleosome_signal"), ncol = 5)
+VlnPlot(rna_atac, features = c("nFeature_RNA", "nFeature_ATAC", "percent.mt", "TSS.enrichment", "nucleosome_signal"), ncol = 5)
 
 # Step 3: Remove cells that have less than 100 features (potential empty droplet) and more than 7500 features (potential doublet) as well as cells that have more than 15% of mitochondrial genes 
-rna <- subset(
-  rna, 
+rna_atac <- subset(
+  rna_atac, 
   subset = nFeature_RNA > 100 &
     nFeature_RNA < 7500 &
     percent.mt < 15 & 
     nCount_ATAC > 100 &
-    nCount_ATAC < 400000 &
+    nCount_ATAC < 100000 &
     nucleosome_signal < 5 &
     TSS.enrichment > 0.5
   )
+
+after_filter <- table(Idents(rna_atac))
+```
+
+## Add drug info to metadata 
+```{r}
+demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
+                       drug = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
+                       sex = c("Male", "Male", "Female", "Female"))
+demo_10x <- rna_atac@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
+demo_10x <- demo_10x %>% left_join(demo, by = "ids")
+new_metadata <- demo_10x[, c("drug", "sex")]
+
+rna_atac <- AddMetaData(object = rna_atac, metadata = new_metadata)
+
+
 
 ```
 

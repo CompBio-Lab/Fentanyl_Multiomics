@@ -7,7 +7,6 @@ date: "2023-10-26"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 # scCODA: Compositional Analysis for Single-Cell Dataset 
 
 ## Import libs
@@ -17,7 +16,6 @@ warnings.filterwarnings("ignore")
 
 import mudata as mu
 import matplotlib.pyplot as plt
-
 import pertpy as pt
 ```
 
@@ -47,10 +45,10 @@ print(adata)
 ## Change saline to "Control" as per requirements of scCODA 
 ```{python}
 def control_fun(x):
-    if x == "saline":
+    if x == "Saline":
       return "Control"
     else:
-     return "fentanyl"
+     return "Fentanyl"
 
 adata.obs['condition'] = adata.obs['condition'].apply(control_fun)
 
@@ -60,7 +58,7 @@ adata.obs['condition'] = adata.obs['condition'].apply(control_fun)
 # run SCCODA
 ```{python}
 sccoda_model = pt.tl.Sccoda()
-sccoda_data = sccoda_model.load(adata, type="cell_level", generate_sample_level=True, cell_type_identifier="seurat_clusters", sample_identifier="SampleID", covariate_obs=["condition", "sex", "seurat_clusters"])
+sccoda_data = sccoda_model.load(adata, type="cell_level", generate_sample_level=True, cell_type_identifier="aba_classification", sample_identifier="SampleID", covariate_obs=["condition", "sex", "aba_classification"])
 print(sccoda_data)
 print(sccoda_data["coda"].X)
 print(sccoda_data["coda"].obs)
@@ -69,7 +67,7 @@ print(sccoda_data["coda"].obs)
 ## How fentanyl affects cell composition 
 ```{python}
 # Select saline and fentanyl data
-sccoda_data.mod["coda_fent"] = sccoda_data["coda"][sccoda_data["coda"].obs["condition"].isin(["Control", "fentanyl"])].copy()
+sccoda_data.mod["coda_fent"] = sccoda_data["coda"][sccoda_data["coda"].obs["condition"].isin(["Control", "Fentanyl"])].copy()
 print(sccoda_data["coda_fent"])
 ```
 
@@ -84,18 +82,20 @@ plt.show()
 sccoda_data = sccoda_model.prepare(sccoda_data, modality_key="coda_fent", formula="condition", reference_cell_type="automatic")
 sccoda_data["coda_fent"]
 ```
+
 ```{python}
 # Run MCMC
 sccoda_model.run_nuts(sccoda_data, modality_key="coda_fent")
 sccoda_data["coda_fent"]
 ```
+
 ```{python}
-sccoda_model.set_fdr(sccoda_data, modality_key="coda_fent", est_fdr=0.1)
+sccoda_model.set_fdr(sccoda_data, modality_key="coda_fent", est_fdr=0.05)
 ```
 
 ## Save condition[T.fentanyl] as a csv 
 ```{python}
-df = sccoda_data["coda_fent"].varm['effect_df_condition[T.fentanyl]'] 
+df = sccoda_data["coda_fent"].varm['effect_df_condition[T.Fentanyl]'] 
 df.to_csv('fent_final.csv', index=False)
 ```
 
@@ -114,6 +114,7 @@ sccoda_model.credible_effects(sccoda_data, modality_key="coda_fent")
 # Stacked barplot for the levels of "Condition"
 pt.pl.coda.stacked_barplot(sccoda_data, modality_key="coda_fent", feature_name="condition")
 plt.show()
+plt.savefig('stacked_barplot.png', bbox_inches='tight')
 ```
 
 ## Plot significant cell types with saved CSV
@@ -126,24 +127,32 @@ library(ggplot2)
 
 # Load csv 
 ```{r}
-df <- read.csv(here::here("Data", "Fent_final.csv"))
+df <- read.csv(here::here("Data", "fent_final.csv"))
 ```
 
 ```{r}
 # Cell type names
-names <- c("Inh_Gata3_Ccdc180_2","Ex_Ebf2_Fzd9_3","Ex_C1ql4_Drd1_3","Ex_Onecut3_Spag16_3","Ex_Fbxo40_Kcnk5_1","Fibro_Eya2_Ccdc192_2","Ex_C1ql4_Prdm6","Ex_Plekhg1_Nox4_Kcp_2","Inh_Frm7_Otop1_1","Ex_Ebf2_Layn","Ex_Tfap2b_Ccdc172_Calcr","Endo_Flt1_Lrg1_1")
-# Code to generate the plot
-p <- df %>%
-  dplyr::filter(!Cell.Type %in% seq(12,17,1)) %>%
-  cbind(names) %>%
-  mutate(names = factor(names, levels=names)) %>%
-  ggplot(aes(x = names, y = log2.fold.change, fill = names)) +
-  geom_bar(stat="identity") +
-  scale_fill_manual(values = c('#1F77B4', '#AEC7E8', '#FF7F0E', '#FFB366', '#2CA02C', '#98DF8A', '#D62728', '#FF9896', '#9467BD', '#C5B0D5', '#8C564B', '#D2B48C' )) + labs(fill = "Cell Type", x = "Cell Type", y = "Log2-fold change") + 
-  ggtitle("Condition[T.fentanyl]") +
-  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+names <- c("Astro-CB NN", "Astro-NT NN", "Bergmann NN", "CB Granule Glut", "CB PLI Gly-Gaba", "CBX Golgi Gly-Gaba", "CBX MLI Cdh22 Gaba", "CBX MLI Megf11 Gaba", "CBX Purkinje Gaba", "DCO UBC Glut", "Endo NN", "MY Lhx1 Gly-Gaba", "OPC NN", "Oligo NN", "PARN-MDRNd-NTS Gbx2 Gly-Gaba", "PG-TRN-LRN Fat2 Glut", "PGRN-PARN-MDRN Hoxb5 Glut", "SPVI-SPVC Sall3 Lhx1 Gly-Gaba", "SPVI-SPVC Sall3 Nfib Gly-Gaba", "SPVI-SPVC Tlx3 Ebf3 Glut", "VLMC NN") 
+           
+```
 
-p
+```{r}
+# code to generate plot 
+p <- df %>%
+  dplyr::filter(Cell.Type %in% 6:17) %>%
+  mutate(names = factor(names[6:17], levels = unique(names[6:17]))) %>%
+  ggplot(aes(x = names, y = log2.fold.change, fill = names)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c('#98DF8A', '#D62728', '#FF9896', '#9467BD', '#C5B0D5', 
+                               '#8C564B', '#D2B48C', '#FF1493', '#FFB6C1', 
+                               '#A9A9A9', '#D3D3D3', '#6B8E23'), length(unique(names[6:17]))) +
+  guides(fill = guide_legend(title = "Cell Type")) + 
+  labs(fill = "Cell Type", x = "Cell Type", y = "Log2-fold change") +
+  ggtitle("Condition[T.fentanyl]") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+print(p)
 ```
 
 
