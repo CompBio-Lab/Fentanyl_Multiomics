@@ -1,14 +1,14 @@
 ---
-title: "Diff_ExpMuscat_ATAC"
+title: "Diff_ExpMuscat_GA"
 output: html_document
-date: "2024-06-06"
+date: "2024-06-05"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Differential State Analysis with `muscat` (ATAC Counts)
+# Differential State Analysis with `muscat` (Gene Activity Counts)
 
 ## Load packages 
 ```{r}
@@ -21,22 +21,29 @@ library(scater)
 library(sctransform)
 library(UpSetR)
 library(sceasy)
+library(SingleCellExperiment)
+library(Seurat)
 ```
 
-## Load data 
+## Load data and create SCE object 
 ```{r}
-# load ATAC seurat object which contains gene activity matrix in RNA assay 
-atac <- readRDS(here::here("Data", "ATAC_signac.rds"))
+# load seurat object which contains gene activity matrix in "GA" assay 
+atac_ga <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 
-# set the default assay to ATAC
-DefaultAssay(atac) <- "ATAC"
+# extract GA counts 
+ga_counts <- GetAssayData(atac_ga, assay = "GA", slot = "counts")
 
-# remove the RNA assay and only keep ATAC
-atac@assays[["RNA"]] <- NULL
+# extract metadata 
+metadata = atac_ga@meta.data
 
-# convert to sce 
-sce <- as.SingleCellExperiment(atac)
-dim(sce)
+# create sce object 
+sce <- SingleCellExperiment(
+  assays = list(counts = ga_counts),
+  colData = metadata,
+  metadata = metadata
+)
+
+sce
 ```
 
 ## Pre-processing 
@@ -67,11 +74,10 @@ assays(sce)$vstresiduals <- vst(counts(sce), verbosity = FALSE)$y
 
 ## Data preparation 
 ```{r}
-sce$id <- paste0(sce$drug, sce$orig.ident)
 (sce <- prepSCE(sce, 
-    kid = "celltype", # subpopulation assignments
-    gid = "drug",  # group IDs (ctrl/stim)
-    sid = "id",   # sample IDs (ctrl/stim.1234)
+    kid = "aba_classification", # subpopulation assignments
+    gid = "condition",  # group IDs (ctrl/stim)
+    sid = "SampleID",   # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
 # store cluster + sample IDs as well as number of clusters and samples 
@@ -91,7 +97,7 @@ df
 ```{r}
 
 gplots::heatmap.2(df/rowSums(df), trace="none",
-                  margins = c(15, 10))
+                  margins = c(10, 10))
 ```
 
 ## Differential state (DS) analysis 
@@ -112,16 +118,14 @@ t(head(assay(pb)))
 
 # use very distinctive shaping of groups & change cluster colors
 pb_mds <- pb_mds + 
-  scale_shape_manual(values = c(17, 4)) +
-  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(6, "Set2"), RColorBrewer::brewer.pal(3, "Set3")))
+  scale_shape_manual(values = c(21, 4)) +
+  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(7, "Set2"), RColorBrewer::brewer.pal(6, "Set3"))) 
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6
 
 pb_mds <- pb_mds + 
-  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed")
-
-pb_mds <- pb_mds + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for ATAC")
+  geom_line(aes(group = cluster_id), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for gene activity")
 
 pb_mds
 ```
@@ -147,7 +151,7 @@ tbl <- res$table$`Fentanyl-Saline`
 # results filtering and overview 
 # filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
 tbl_fil <- lapply(tbl, function(u) {
-  u_filtered <- subset(u, p_adj.loc < 0.5)
+  u_filtered <- subset(u, p_adj.loc < 0.6)
   u_filtered <- dplyr::arrange(u_filtered, p_adj.loc)
   return(u_filtered)
 })
@@ -171,6 +175,7 @@ t(head(frq10))
 
 
 ```{r}
+# second filtration step which can be done but not done for this analysis 
 kids2 <- names(tbl_fil)[sapply(tbl_fil, nrow) != 0]
 names(kids2) <- kids2
 
@@ -183,39 +188,23 @@ n_de <- vapply(tbl_fil2, nrow, numeric(1))
 p_de <- format(n_de / nrow(sce) * 100, digits = 3)
 data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
 
-# generation of top table 
-top_atac <- do.call(rbind, tbl_fil2)
+topfil_GA <- do.call(rbind, tbl_fil)
+top_GA <- do.call(rbind, tbl)
 
 # plot top table 
-top_atac %>%
+topfil_GA %>%
   ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
   geom_point() +
   geom_text_repel() +
   theme_minimal() +
   labs(
-    title = "Volcano Plot (ATAC)",
+    title = "Volcano Plot (Gene Activity)",
     x = "Log Fold Change",
     y = "-Log10 P-value",
     color = "Cluster"
   )
 
 ```
-
-## Find the closest genes to the differentially expressed peaks 
-```{r}
-# run closest feature that gives you the closest genes using the regions from atac object 
-closest_genes <- ClosestFeature(atac, regions = granges(atac))
-
-# rename the 'gene' column to 'regions' as they are actully regions
-top_atac <- top_atac %>%
-  dplyr::rename(regions = gene)
-
-# left join query regions (from closest_genes) with regions that are differentially expressed (in differentially expressed peaks) and add the genes from the gene col into top table. 
-top_atac <- left_join(top_atac, 
-                         closest_genes %>% select(query_region, gene_name), 
-                         by = c("regions" = "query_region"))
-```
-
 
 ## Visualize results 
 ```{r}
@@ -227,8 +216,8 @@ upset(fromList(de_gs_by_k))
 
 # top-5 DS genes per cluster
 pbHeatmap(sce, res, top_n = 5)
-pbHeatmap(example_sce, res_0, top_n = 5)
 ```
+
 
 ```{r}
 group <- factor(rep(c("fent", "sal"), each = 2))
@@ -239,9 +228,9 @@ plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
 
 ## Save top table 
 ```{r}
-saveRDS(top_atac, file = here::here("Data", "top_atac.rds"))
+saveRDS(topfil_GA, file = here::here("Data", "topfil_GA.rds"))
+saveRDS(top_GA, file = here::here("Data", "top_GA.rds"))
 ```
-
 
 ```{r}
 sessionInfo()

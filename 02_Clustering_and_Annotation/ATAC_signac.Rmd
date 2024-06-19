@@ -19,30 +19,10 @@ library(EnsDb.Rnorvegicus.v75)
 library(GenomicRanges)
 ```
 
-## Load ATAC seurat object from qc_metrics rmd 
+## Load seurat object 
 ```{r}
-atac <- readRDS(here::here ("Data", "ATAC_subset.rds"))
-```
-
-## Normalization and linear dimensional reduction 
-```{r}
-atac <- RunTFIDF(atac) # normalization 
-atac <- FindTopFeatures(atac, min.cutoff = 5) # find top features 
-atac <- RunSVD(atac) # dimensionality reduction 
-
-DepthCor(atac)
-```
-
-## Non-linear dimensionality reduction technique 
-```{r}
-atac <- RunUMAP(object = atac, reduction = "lsi", dims = 2:40)
-atac <- FindNeighbors(object = atac, reduction = "lsi", dims = 2:40)
-atac <- FindClusters(object = atac, algorithm = 3)
-```
-
-## Visualize cluster 
-```{r}
-DimPlot(object = atac, label = TRUE)
+atac <- readRDS(here::here ("Data", "GEX_ATAC_Seur.rds"))
+DefaultAssay(atac) <- "ATAC"
 ```
 
 
@@ -51,10 +31,10 @@ DimPlot(object = atac, label = TRUE)
 gene.activities <- GeneActivity(atac)
 
 # add the gene activity matrix to the Seurat object as a new assay and normalize it
-atac[['RNA']] <- CreateAssayObject(counts = gene.activities)
+atac[['GA']] <- CreateAssayObject(counts = gene.activities)
 atac <- NormalizeData(
   object = atac,
-  assay = 'RNA',
+  assay = 'GA',
   normalization.method = 'LogNormalize',
   scale.factor = median(atac$nCount_RNA)
 )
@@ -77,37 +57,9 @@ CoveragePlot(
 )
 ```
 
-# Add cell labels from MultVI to atac object 
-
-## Load in seurat object 
-```{r}
-gex_atac <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
-```
-
-## Extract cell labels 
-```{r}
-cell_types <- as.character(gex_atac@active.ident)
-```
-
-## add cell types into atac dataset 
-```{r}
-atac <- AddMetaData(object = atac, metadata = cell_types, col.name = "celltype")
-```
-
-# Add meta data (drug and sex)
-```{r}
-demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
-                       drug = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
-                       sex = c("Male", "Male", "Female", "Female"))
-demo_10x <- atac@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
-demo_10x <- demo_10x %>% left_join(demo, by = "ids")
-new_metadata <- demo_10x[, c("drug", "sex")]
-atac <- AddMetaData(object = atac, metadata = new_metadata)
-```
-
 ## Save rds 
 ```{r}
-saveRDS(atac, file = here::here("Data", "ATAC_signac.rds"))
+saveRDS(atac, file = here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
 

@@ -1,14 +1,14 @@
 ---
-title: "Diff_ExpMuscat_RNA"
+title: "Diff_ExpMuscat_ATAC"
 output: html_document
-date: "2024-06-05"
+date: "2024-06-06"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Differential State Analysis with `muscat` (RNA counts)
+# Differential State Analysis with `muscat` (ATAC Counts)
 
 ## Load packages 
 ```{r}
@@ -20,12 +20,30 @@ library(purrr)
 library(scater)
 library(sctransform)
 library(UpSetR)
+library(sceasy)
+library(SingleCellExperiment)
+library(Seurat)
 ```
 
-## Load data 
+## Load data and create SCE object 
 ```{r}
-sce <- Seurat::as.SingleCellExperiment(readRDS(here::here("Data", "GEX_ATAC_Seur.rds")))
-dim(sce)
+# load seurat object which contains gene activity matrix in "GA" assay 
+atac <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
+
+# extract GA counts 
+atac_counts <- GetAssayData(atac, assay = "ATAC", slot = "counts")
+
+# extract metadata 
+metadata = atac@meta.data
+
+# create sce object 
+sce <- SingleCellExperiment(
+  assays = list(counts = atac_counts),
+  colData = metadata,
+  metadata = metadata
+)
+
+sce
 ```
 
 ## Pre-processing 
@@ -51,16 +69,15 @@ sce <- computeLibraryFactors(sce)
 sce <- logNormCounts(sce)
 
 # perform variance stabilization transformation using the sctransform package 
-assays(sce)$vstresiduals <- vst(counts(sce), verbosity = FALSE)$y
+#assays(sce)$vstresiduals <- vst(counts(sce), verbosity = FALSE)$y
 ```
 
 ## Data preparation 
 ```{r}
-sce$id <- paste0(sce$drug, sce$orig.ident)
 (sce <- prepSCE(sce, 
     kid = "aba_classification", # subpopulation assignments
-    gid = "drug",  # group IDs (ctrl/stim)
-    sid = "id",   # sample IDs (ctrl/stim.1234)
+    gid = "condition",  # group IDs (ctrl/stim)
+    sid = "SampleID",   # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
 # store cluster + sample IDs as well as number of clusters and samples 
@@ -75,6 +92,12 @@ names(kids) <- kids; names(sids) <- sids
 df <- t(table(sce$cluster_id, sce$sample_id))
 df
 
+```
+
+```{r}
+
+gplots::heatmap.2(df/rowSums(df), trace="none",
+                  margins = c(15, 10))
 ```
 
 ## Differential state (DS) analysis 
@@ -102,7 +125,9 @@ pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6
 
 pb_mds <- pb_mds + 
-  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for RNA")
+  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed")
+
+pb_mds <- pb_mds + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for ATAC")
 
 pb_mds
 ```
@@ -128,7 +153,7 @@ tbl <- res$table$`Fentanyl-Saline`
 # results filtering and overview 
 # filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
 tbl_fil <- lapply(tbl, function(u) {
-  u_filtered <- subset(u, p_adj.loc < 0.3)
+  u_filtered <- subset(u, p_adj.loc < 0.5)
   u_filtered <- dplyr::arrange(u_filtered, p_adj.loc)
   return(u_filtered)
 })
@@ -150,7 +175,9 @@ t(head(frq10))
 
 ```
 
+
 ```{r}
+# second filtration step which can be done but not done for this analysis 
 kids2 <- names(tbl_fil)[sapply(tbl_fil, nrow) != 0]
 names(kids2) <- kids2
 
@@ -163,21 +190,42 @@ n_de <- vapply(tbl_fil2, nrow, numeric(1))
 p_de <- format(n_de / nrow(sce) * 100, digits = 3)
 data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
 
-top <- do.call(rbind, tbl_fil2)
+# generation of top table 
+topfil_ATAC <- do.call(rbind, tbl_fil)
+top_ATAC <- do.call(rbind, tbl)
 
 # plot top table 
-top %>% 
-    ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
+topfil_ATAC %>%
+  ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
   geom_point() +
   geom_text_repel() +
   theme_minimal() +
   labs(
-    title = "Volcano Plot (Gene Expression)",
+    title = "Volcano Plot (ATAC)",
     x = "Log Fold Change",
     y = "-Log10 P-value",
-    color = "Cluster")
+    color = "Cluster"
+  )
 
 ```
+
+## Find the closest genes to the differentially expressed peaks 
+```{r}
+DefaultAssay(atac) <- "ATAC"
+
+# run closest feature that gives you the closest genes using the regions from atac object 
+closest_genes <- ClosestFeature(atac, regions = granges(atac))
+
+# rename the 'gene' column to 'regions' as they are actually regions
+topfil_ATAC <- topfil_ATAC %>%
+  dplyr::rename(regions = gene)
+
+# left join query regions (from closest_genes) with regions that are differentially expressed (in differentially expressed peaks) and add the genes from the gene col into top table. 
+topfil_ATAC <- left_join(topfil_ATAC, 
+                         closest_genes %>% select(query_region, gene_name), 
+                         by = c("regions" = "query_region"))
+```
+
 
 ## Visualize results 
 ```{r}
@@ -188,11 +236,11 @@ upset(fromList(de_gs_by_k))
 # sample level viz: Pseudobulk heatmaps
 
 # top-5 DS genes per cluster
-pbHeatmap(sce, res, top_n = 5, )
+pbHeatmap(sce, res, top_n = 5)
+pbHeatmap(example_sce, res_0, top_n = 5)
 ```
 
 ```{r}
-# plotting expression of one gene 
 group <- factor(rep(c("fent", "sal"), each = 2))
 plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
 
@@ -201,10 +249,11 @@ plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
 
 ## Save top table 
 ```{r}
-saveRDS(top, file = here::here("Data", "top_gex.rds"))
+saveRDS(topfil_ATAC, file = here::here("Data", "topfil_ATAC.rds"))
+saveRDS(top_ATAC, file = here::here("Data", "top_ATAC.rds"))
 ```
+
 
 ```{r}
 sessionInfo()
 ```
-
