@@ -7,10 +7,9 @@ This repository includes SnRNAseq and SnATACseq analysis pipeline on the rat mid
 * QC metrics 
 * Cell type annotation (MultiVI) 
 * Cell proportions (scCODA) 
-* Cell specific differentially expressed genes and peaks (Limma) 
+* Cell specific differential state analysis (Muscat) 
 * Enriched Pathways (EnrichR)
 * Cell-cell communication (scDiffCom)
-* Multimodal integration (DIABLO)
 * Spatial data analysis for validation (CosMx) 
 
 ## Reproducibility 

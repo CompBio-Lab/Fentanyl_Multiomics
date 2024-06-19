@@ -1,0 +1,148 @@
+---
+title: "fgsea_enrichr"
+output: html_document
+date: "2024-06-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Enriched Pathways using fgsea
+
+## Load libraries 
+```{r}
+library(fgsea)
+library(dplyr)
+library(cowplot)
+```
+
+## Load KEGG and WikiPathways 
+```{r}
+kegg0 <- read.csv(here::here("05_Pathway_Analysis", "KEGG_2019_Mouse.csv"), header = FALSE)
+kegg <- lapply(1:nrow(kegg0), function(i){
+  x <- na.omit(as.character(kegg0[i,-1]))
+  unique(x[x!="" & x != "NA"])
+})
+names(kegg) <- kegg0$V1
+wiki0 <- read.csv(here::here("05_Pathway_Analysis", "WikiPathways_2019_Mouse.csv"), header = FALSE)
+wiki <- lapply(1:nrow(wiki0), function(i){
+  x <- na.omit(as.character(wiki0[i,-1]))
+  unique(x[x!="" & x != "NA"])
+})
+names(wiki) <- sapply(strsplit(wiki0$V1, "WP"), function(i){ i[[1]]})
+pathways <- list("KEGG" = kegg, "WikiPathways" = wiki)
+```
+
+## Load top table (gex)
+```{r}
+top <- readRDS(here::here("Data", "top_GEX.rds"))
+
+# extract individual cell types 
+BN <- top[top$cluster_id == "Bergmann NN", ]
+CBGlut <- top[top$cluster_id == "CB Granule Glut", ]
+CBXGaba <- top[top$cluster_id == "CBX MLI Megf11 Gaba", ]
+Oligo <- top[top$cluster_id == "Oligo NN", ]
+
+# create csv
+write.csv(BN, file = here::here("05_Pathway_Analysis", "cells", "BN.csv"))
+write.csv(CBGlut, file = here::here("05_Pathway_Analysis", "cells", "CBGlut.csv"))
+write.csv(CBXGaba, file = here::here("05_Pathway_Analysis", "cells", "CBXGaba.csv"))
+write.csv(Oligo, file = here::here("05_Pathway_Analysis", "cells", "Oligo.csv"))
+```
+
+```{r}
+cc <- list.files(here::here("05_Pathway_Analysis", "cells"))
+```
+
+## ranking genes 
+```{r}
+ranks <- lapply(cc, function(i){
+  top <- read.csv(here::here("05_Pathway_Analysis", "cells", i), header = TRUE)
+  ranks <- top$t
+  names(ranks) <- toupper(top$gene)
+  ranks
+})
+names(ranks) <- gsub(".csv", "", cc)
+```
+
+## Performing fgsea 
+```{r}
+result <- lapply(cc, function(i){
+  bn <- read.csv(here::here("05_Pathway_Analysis", "cells", i), header = TRUE)
+  bn_ranks <- bn$t
+  names(bn_ranks) <- toupper(bn$gene)
+  
+  cell <- gsub(".csv", "", i)
+  fgsea_kegg <- fgsea(pathways = kegg, stats = bn_ranks,
+                    minSize  = 5, maxSize  = 500)
+  fgsea_kegg$DB <- "KEGG"
+  fgsea_wiki <- fgsea(pathways = wiki, stats = bn_ranks,
+                      minSize  = 5, maxSize  = 500)
+  fgsea_wiki$DB <- "WikiPathways"
+  fgseaRes <- rbind(fgsea_kegg, fgsea_wiki)
+  fgseaRes$cell <- cell
+  fgseaRes
+}) %>% 
+  do.call(rbind, .)
+```
+
+## Filtering significant results 
+```{r}
+sig_res <- result %>% 
+  group_by(cell) %>% 
+  filter(padj < 0.1)
+
+sig_kegg <- subset(sig_res, DB == "KEGG" & cell == "BN")
+sig_wiki <- subset(sig_res, DB == "WikiPathways" & cell == "BN")
+plotGseaTable(c(pathways[["KEGG"]][sig_kegg$pathway],
+                pathways[["WikiPathways"]][sig_wiki$pathway]), 
+              ranks[["BN"]], rbind(sig_kegg, sig_wiki), 
+              gseaParam=0.5)
+```
+
+## Cowplot 
+```{r}
+plotlist <- list()
+for(cc in names(ranks)){
+  sig_kegg <- subset(sig_res, DB == "KEGG" & cell == cc)
+  sig_wiki <- subset(sig_res, DB == "WikiPathways" & cell == cc)
+  plotlist[[cc]] <- plotGseaTable(c(pathways[["KEGG"]][sig_kegg$pathway],
+                  pathways[["WikiPathways"]][sig_wiki$pathway]), 
+                ranks[[cc]], rbind(sig_kegg, sig_wiki), 
+                gseaParam=0.5)
+}
+plot_grid(plotlist = plotlist, labels = names(ranks), ncol = 2)
+```
+
+
+
+```{r}
+# Create two separate lists for plotting
+plotlist1 <- list()
+plotlist2 <- list()
+
+# Iterate through cell types and create plots
+for (cc in names(ranks)) {
+  sig_kegg <- subset(sig_res, DB == "KEGG" & cell == cc)
+  sig_wiki <- subset(sig_res, DB == "WikiPathways" & cell == cc)
+  
+  plot <- plotGseaTable(
+    c(pathways[["KEGG"]][sig_kegg$pathway],
+      pathways[["WikiPathways"]][sig_wiki$pathway]), 
+    ranks[[cc]], rbind(sig_kegg, sig_wiki), 
+    gseaParam = 0.5
+  )
+  
+  if (cc %in% c("BN", "CBGlut")) {
+    plotlist1[[cc]] <- plot
+  } else {
+    plotlist2[[cc]] <- plot
+  }
+}
+
+# Create separate plot grids for the two sets of cell types
+plot_grid(plotlist = plotlist1, labels = names(plotlist1), ncol = 1)
+plot_grid(plotlist = plotlist2, labels = names(plotlist2), ncol = 1)
+```
+
