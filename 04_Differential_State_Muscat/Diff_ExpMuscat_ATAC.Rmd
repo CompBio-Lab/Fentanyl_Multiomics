@@ -153,7 +153,7 @@ tbl <- res$table$`Fentanyl-Saline`
 # results filtering and overview 
 # filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
 tbl_fil <- lapply(tbl, function(u) {
-  u_filtered <- subset(u, p_adj.loc < 0.5)
+  u_filtered <- subset(u, p_adj.loc < 0.3)
   u_filtered <- dplyr::arrange(u_filtered, p_adj.loc)
   return(u_filtered)
 })
@@ -175,21 +175,9 @@ t(head(frq10))
 
 ```
 
+## No differentially expressed fragments found so analysis was stopped here. However, the following steps can be done if significant results were found. 
 
 ```{r}
-# second filtration step which can be done but not done for this analysis 
-kids2 <- names(tbl_fil)[sapply(tbl_fil, nrow) != 0]
-names(kids2) <- kids2
-
-tbl_fil2 <- lapply(kids2, function(k)
-  dplyr::filter(tbl_fil[[k]], 
-    gene %in% names(which(frq10[, k]))))
-
-# nb. of DS genes & % of total by cluster
-n_de <- vapply(tbl_fil2, nrow, numeric(1))
-p_de <- format(n_de / nrow(sce) * 100, digits = 3)
-data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
-
 # generation of top table 
 topfil_ATAC <- do.call(rbind, tbl_fil)
 top_ATAC <- do.call(rbind, tbl)

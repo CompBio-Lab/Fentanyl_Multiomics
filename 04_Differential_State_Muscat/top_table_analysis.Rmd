@@ -22,7 +22,6 @@ library(tidyr)
 ## Load 3 top tables (gex, atac and gene activity)
 ```{r}
 top_gex <- readRDS(here::here("Data", "topfil_GEX.rds"))
-top_atac <- readRDS(here::here("Data", "topfil_ATAC.rds"))
 top_ga <- readRDS(here::here("Data", "topfil_GA.rds"))
 ```
 
@@ -44,19 +43,19 @@ gene_counts <- df_gex %>%
   mutate(dataset = "gex")
 
 # ATAC Counts (filter for only one cell type as top_ga and top_gex only have DEGs for this one cell type)
-top_atac <- top_atac %>% filter(p_adj.loc < 0.20) %>% filter(cluster_id == "CB Granule Glut")
+#top_atac <- top_atac %>% filter(p_adj.loc < 0.20) %>% filter(cluster_id == "CB Granule Glut")
 
 # Process ATAC dataset
-df_atac <- top_atac %>%
-  mutate(dataset = "atac") %>%
-  select(cluster_id, dataset, logFC) %>%
-  mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
+#df_atac <- top_atac %>%
+  #mutate(dataset = "atac") %>%
+  #select(cluster_id, dataset, logFC) %>%
+  #mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
 
-atac_counts <- df_atac %>%
-  group_by(cluster_id, regulation) %>%
-  summarise(count = n()) %>%
-  pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
-  mutate(dataset = "atac")
+#atac_counts <- df_atac %>%
+  #group_by(cluster_id, regulation) %>%
+  #summarise(count = n()) %>%
+  #pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
+  #mutate(dataset = "atac")
   
 # GA Counts 
 top_ga <- top_ga %>% filter(p_adj.loc < 0.60)
@@ -79,7 +78,7 @@ ga_counts <- df_ga %>%
 ```{r}
 
 # Combine datasets and ensure correct aggregation
-combined_counts <- bind_rows(gene_counts, atac_counts, ga_counts)
+combined_counts <- bind_rows(gene_counts, ga_counts)
 
 # Aggregate counts to avoid duplicates
 aggregated_counts <- combined_counts %>%
@@ -211,7 +210,7 @@ print(intersect_genes_df)
 #C1qb, Helb
 ```
 
-# Bar plot? 
+# Bar plot 
 ```{r}
 # Define the intersect genes for annotation
 intersect_genes <- top_gex %>%
@@ -242,4 +241,6 @@ ggplot(bar_data, aes(x = category, y = count, fill = category)) +
   theme(plot.title = element_text(hjust = 0.5))
 
 ```
+
+# plot the intersecting genes 
 

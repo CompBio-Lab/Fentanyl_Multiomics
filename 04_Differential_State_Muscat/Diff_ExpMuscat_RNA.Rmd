@@ -68,11 +68,6 @@ dim(sce)
 sce <- computeLibraryFactors(sce)
 sce <- logNormCounts(sce)
 
-# perform variance stabilization transformation using the sctransform package 
-#assays(sce)$vstresiduals <- vst(counts(sce), latent_var = "percent.mt", verbosity = FALSE)$y
-# set negative counts to zero 
-#assays(sce)$vstresiduals <- pmax(assays(sce)$vstresiduals, 0)
-
 ```
 
 ## Data preparation 
@@ -116,7 +111,7 @@ t(head(assay(pb)))
 
 # use very distinctive shaping of groups & change cluster colors
 pb_mds <- pb_mds + 
-  scale_shape_manual(values = c(21, 4)) +
+  scale_shape_manual(values = c(17, 4)) +
   scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(7, "Set2"), RColorBrewer::brewer.pal(6, "Set3")))
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5

@@ -28,10 +28,10 @@ library(Seurat)
 ## Load data and create SCE object 
 ```{r}
 # load seurat object which contains gene activity matrix in "GA" assay 
-atac_ga <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
+atac_ga <- readRDS(here::here("Data", "GEX_ATAC_GA.rds"))
 
 # extract GA counts 
-ga_counts <- GetAssayData(atac_ga, assay = "GA", slot = "counts")
+ga_counts <- GetAssayData(atac_ga, assay = "SCT", slot = "counts")
 
 # extract metadata 
 metadata = atac_ga@meta.data
@@ -68,8 +68,6 @@ dim(sce)
 sce <- computeLibraryFactors(sce)
 sce <- logNormCounts(sce)
 
-# perform variance stabilization transformation using the sctransform package 
-assays(sce)$vstresiduals <- vst(counts(sce), verbosity = FALSE)$y
 ```
 
 ## Data preparation 
@@ -118,7 +116,7 @@ t(head(assay(pb)))
 
 # use very distinctive shaping of groups & change cluster colors
 pb_mds <- pb_mds + 
-  scale_shape_manual(values = c(21, 4)) +
+  scale_shape_manual(values = c(17, 4)) +
   scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(7, "Set2"), RColorBrewer::brewer.pal(6, "Set3"))) 
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5
@@ -151,7 +149,7 @@ tbl <- res$table$`Fentanyl-Saline`
 # results filtering and overview 
 # filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
 tbl_fil <- lapply(tbl, function(u) {
-  u_filtered <- subset(u, p_adj.loc < 0.6)
+  u_filtered <- subset(u, p_adj.loc < 0.3)
   u_filtered <- dplyr::arrange(u_filtered, p_adj.loc)
   return(u_filtered)
 })

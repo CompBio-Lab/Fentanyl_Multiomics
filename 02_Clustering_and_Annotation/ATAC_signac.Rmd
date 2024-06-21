@@ -40,6 +40,13 @@ atac <- NormalizeData(
 )
 ```
 
+```{r}
+# sctransform GA counts 
+DefaultAssay(atac) <- "GA"
+atac <- SCTransform(atac)
+```
+
+
 ## Call Peaks 
 ```{r}
 # in order for call peaks to run, you must have MACS2 which can be downloaded by using the conda - "conda install bioconda::macs2" or pip - "pip install MACS2". 
@@ -59,7 +66,7 @@ CoveragePlot(
 
 ## Save rds 
 ```{r}
-saveRDS(atac, file = here::here("Data", "GEX_ATAC_Seur.rds"))
+saveRDS(atac, file = here::here("Data", "GEX_ATAC_GA.rds"))
 ```
 
 

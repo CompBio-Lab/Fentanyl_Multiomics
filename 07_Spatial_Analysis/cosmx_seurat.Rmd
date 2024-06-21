@@ -8,7 +8,7 @@ date: "2024-06-06"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Spatial Transcriptomics (seurat pipeline)
+# Spatial Transcriptomics
 
 ## Load libraries 
 ```{r}
@@ -21,6 +21,13 @@ library(tidyr)
 library(fgsea)
 library(SeuratData)
 library(SeuratDisk)
+library(reticulate)
+library(anndata)
+
+future::plan("multisession", workers = 4)
+options(future.globals.maxSize = 50000 * 1024^2) # for 50 Gb RAM
+
+set.seed(1234)
 ```
 
 ## Load data 
@@ -45,91 +52,180 @@ rownames(cosmx_counts) <- cosmx_counts0$target
 
 ## create seurat object using counts 
 ```{r}
-cosmx.obj <- CreateSeuratObject(counts = cosmx_counts, assay = "RNA",
+cosmx <- CreateSeuratObject(counts = cosmx_counts, assay = "RNA",
                                  min.cells = 10, min.features = 10)
+selectedfeatures <- rownames(cosmx)[-grep("Custom|NegPrb", rownames(cosmx))]
+cosmx <- subset(
+  x = cosmx,
+  features = selectedfeatures
+)
 ```
 
 ## Variance stablization and transformation 
 ```{r}
-cosmx.obj <- SCTransform(cosmx.obj, assay = "RNA", clip.range = c(-10, 10))
+cosmx <- SCTransform(cosmx, assay = "RNA")
 ```
 
 ## Perform linear dimensional reduction 
 ```{r}
 # perform PCA on scaled data 
-cosmx.obj <- RunPCA(cosmx.obj, npcs = 30, features = rownames(cosmx.obj))
+cosmx <- RunPCA(cosmx, npcs = 50, features = rownames(cosmx))
 ```
 
 ## Run non-linear dimensionality reduction (UMAP)
 ```{r}
-cosmx.obj <- RunUMAP(cosmx.obj, dims = 1:30)
+cosmx <- RunUMAP(cosmx, dims = 1:50)
 ```
 
 ## Cluster the cells 
 ```{r}
-cosmx.obj <- FindNeighbors(cosmx.obj, dims = 1:30, reduction = "pca")
-cosmx.obj <- FindClusters(cosmx.obj, resolution = 0.6)
+cosmx <- FindNeighbors(cosmx, reduction = "pca", dims = 1:50)
+cosmx <- FindClusters(cosmx, resolution = 0.6)
 ```
 
 ## DimPlot 
 ```{r}
-DimPlot(cosmx.obj, reduction = "umap")
+DimPlot(cosmx, reduction = "umap")
 ```
 
-## Manual annotation 
+# Annotate using MapMyCells - Allen Brain Institute
+
+## Save corrected counts to h5ad 
 ```{r}
-#Now let's extract the top marker genes, and see which ones correspond with each cluster. This can be done using the FindAllMarkers function within Seurat.
-cosmx.obj <- PrepSCTFindMarkers(object = cosmx.obj, assay = "SCT")
-cluster_markers <- FindAllMarkers(cosmx.obj) # finds which genes are different 
+use_condaenv(condaenv = '/Users/rishikadaswani/anaconda3/envs/cellanno', required = TRUE)
+
+minimal_adata <- t(cosmx@assays$SCT$counts)
+
+ad <- AnnData(
+   X = minimal_adata,
+   obs = data.frame(group = rownames(minimal_adata), row.names = rownames(minimal_adata)),
+   var = data.frame(type = colnames(minimal_adata), row.names = colnames(minimal_adata))
+ )
+
+ write_h5ad(ad,here::here("Data", "cosmx_fent_counts.h5ad"), compression='gzip')
 ```
 
-## Fast gene set enrichment analysis 
+## The h5ad file gets inputted into the https://knowledge.brain-map.org/mapmycells/process
+
 ```{r}
-mouse_brain <- read.csv(here::here("Data", "biorxiv_mouse_brain.csv"))
-#mbrain_genesets <- sapply(strsplit(mouse_brain$Optimally.Sized.Gene.List, "\\||="), function(i){
-  #i[-grep("ENS", i)]})
-
-mbrain_genesets_new <- split(cluster_markers$gene, cluster_markers$cluster)
-names(mbrain_genesets_new) <- unique(cluster_markers$cluster)
-
-#names(mbrain_genesets) <- mouse_brain$Cell.Type.Name
-#mbrain_genesets <- mbrain_genesets[sapply(mbrain_genesets, length) != 0]
-
-fc <- cluster_markers$avg_log2FC
-names(fc) <- rownames(cluster_markers)
-fc_cl <- split(fc, cluster_markers$cluster)
-
-cluster_annotations <- lapply(fc_cl, function(i){
-  res <- fgsea(mbrain_genesets_new, i)
-  res <- res[order(res$pval),]
-  res$pathway[1]
-})
+#load output from above 
+cellann0 <- read.csv(here::here("Data","cosmx_fent_counts_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1718838739181", "cosmx_fent_counts_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1718838739181.csv"), header = FALSE)
+cellann <- cellann0[-c(1:5), ]
+colnames(cellann) <- as.character(cellann0[5,])
 ```
 
-## Labelling clusters with cell type 
 ```{r}
-Dim_plot <- DimPlot(cosmx.obj, reduction = "umap", label = F, pt.size = 0.5) + ggtitle("Spatial analysis clusters by cell type", aes(color = 1)) + theme_bw() + theme(axis.text.x = element_text(size = 14, colour = "black"), 
-axis.text.y = element_text(size = 15, colour = "black"), plot.title = element_text(size = 14, face = 
-"bold"))
 
-LabelClusters(Dim_plot, id = "ident", fontface = "bold") +
-  theme(text = element_text(size = 14, face="bold"), 
-                             legend.text = element_text(size = 10, face = 
-"bold"))
+subclass <- na.omit(readxl::read_xlsx(here::here("Data", "cl.df_CCN202307220.xlsx"), sheet = "subclass_annotation"))
+row.names(subclass) <- subclass$cell_set_accession.subclass
+cc <- subclass[cellann$subclass_label, "subclass_label"]
+rownames(cc) <- cellann$cell_id
+cosmx@meta.data$aba_classification = cc[colnames(cosmx), ]
 
 ```
 
-## Load GEX (and ATAC) seurat object 
+```{r}
+aba_cellann <- table(cosmx$aba_classification)
+
+celltypes_more20 <- aba_cellann[aba_cellann > 20] |> names()
+
+keep_cellann <- cosmx@meta.data %>%
+                filter(aba_classification$subclass_label %in% celltypes_more20)
+
+
+cosmx <- subset(cosmx, cells = rownames(keep_cellann))
+overlap <- table(cosmx$aba_classification, cosmx$seurat_clusters)
+Heatmap(overlap/rowSums(overlap),
+        cell_fun = function(j, i, x, y, w, h, col) { # add text to each grid
+        grid.text(overlap[i, j], x, y)
+    })
+  
+
+```
+
+# Find Markers 
+```{r}
+Idents(cosmx) <- "aba_classification"
+markers <- FindAllMarkers(cosmx,
+                          assay = "SCT",
+                          logfc.threshold = .1, 
+                          only.pos = TRUE,
+                          min.pct=0.1) %>% 
+  group_by(cluster) %>% 
+  dplyr::slice(1:2)
+cluster_markers <- split(markers$gene, markers$cluster)
+lapply(cluster_markers, length)
+
+# Heatmap showing gene markers for each cell type 
+DoHeatmap(cosmx, features = markers$gene, angle = 90, size = 2, vjust = 0.6, hjust = 0.2) + NoLegend() + theme(axis.text.y = element_text(size = 5.5, face = "bold")) 
+
+
+# UMAP showing clusters with labelled cell types 
+DimPlot(cosmx, reduction = "umap", label = TRUE, label.size = 4, repel = TRUE) + ggtitle("Spatial transcriptomics labelled clusters") + theme(plot.title = element_text(hjust = 0.5), legend.text = element_text(size = 14, face = "bold"))
+```
+
+## Add image data 
+```{r}
+data.dir <- here::here("07_Spatial_Analysis", "Rat_Brain")
+fov = "rat_brain"
+assay = "SCT"
+data <- ReadNanostring(data.dir = data.dir, type = c("centroids", 
+        "segmentations"))
+segs <- CreateSegmentation(data$segmentations)
+cents <- CreateCentroids(data$centroids)
+segmentations.data <- list(centroids = cents, segmentation = segs)
+coords <- CreateFOV(coords = segmentations.data, type = c("segmentation", 
+    "centroids"), molecules = data$pixels, assay = assay)
+cells <- intersect(Cells(x = coords, boundary = "segmentation"), 
+    Cells(x = coords, boundary = "centroids"))
+cells <- intersect(Cells(cosmx), cells)
+coords <- subset(x = coords, cells = cells)
+cosmx[[fov]] <- coords
+cosmx
+```
+
+
+```{r}
+ImageDimPlot(cosmx, fov = "rat_brain", axes = TRUE, cols = "glasbey",
+             group.by = 'aba_classification', crop = TRUE) & NoLegend()
+```
+
+```{r}
+tr <- cosmx
+basal.crop <- Crop(tr[["rat_brain"]], x = c(-25000, -10000), y = c(326000, 333000))
+tr[["rat_brain"]] <- basal.crop
+DefaultBoundary(tr[["rat_brain"]]) <- "segmentation"
+ImageDimPlot(cosmx, fov = "rat_brain", axes=TRUE, group.by = 'aba_classification', border.color = "black") + ggtitle("Cell types for each sample on spatial slide")
+```
+
+## load multiome seurat object 
 ```{r}
 gex_atac <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 ```
 
-## Do cell types match between the two datasets 
+## Common cell types between GEX and spatial 
 ```{r}
-rna_cell <- Idents(gex_atac)
-spatial_cell <- Idents(cosmx.obj)
+common <- intersect(unique(gex_atac@meta.data$aba_classification),
+          unique(cosmx@meta.data$aba_classification$subclass_label))
+```
 
-common_cell_types <- intersect(levels(rna_cell), levels(spatial_cell))
+## Subset data for common cell types 
+```{r}
+
+subclass_level <- as.character(cosmx@meta.data$aba_classification$subclass_label)
+
+cosmx$aba_classification <- subclass_level
+
+cosmx_subset <- subset(cosmx, cells = Cells(cosmx)[cosmx@meta.data$aba_classification %in% common])
+
+gex_atac_subset <- subset(gex_atac, cells = Cells(gex_atac)[gex_atac$aba_classification %in% common])
+```
+
+## Visualize common cell types on spatial slide 
+```{r}
+ImageDimPlot(cosmx_subset, fov = "rat_brain", axes = TRUE, cols = "glasbey",
+             group.by = 'aba_classification', crop = TRUE) + ggtitle ("Common cell types between spatial and multiome on slide")
+
 ```
 
 
