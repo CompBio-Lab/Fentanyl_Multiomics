@@ -30,7 +30,7 @@ library(Seurat)
 rna_atac <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 
 # extract SCT counts 
-sct_counts <- GetAssayData(rna_atac, assay = "SCT", slot = "counts")
+sct_counts <- GetAssayData(rna_atac, assay = "SCT", layer = "counts")
 
 # extract metadata 
 metadata <- rna_atac@meta.data

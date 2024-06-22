@@ -32,7 +32,7 @@ set.seed(1234)
 
 ## Load data 
 ```{r}
-cosmx_eset <- read.csv(here::here("Data", "Run5618_RtBrain_tx_file.csv"))
+cosmx_eset <- read.csv(here::here("Data", "rat_brain", "Run5618_RtBrain_tx_file.csv"))
 cosmx_demo <- read.csv(here::here("Data", "fov_annotations.csv"))
 ```
 

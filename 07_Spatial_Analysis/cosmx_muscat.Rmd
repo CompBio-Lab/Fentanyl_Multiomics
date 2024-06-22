@@ -1,14 +1,14 @@
 ---
-title: "Diff_ExpMuscat_GA"
+title: "cosmx_muscat"
 output: html_document
-date: "2024-06-05"
+date: "2024-06-22"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Differential State Analysis with `muscat` (Gene Activity Counts)
+# Differential State Analysis with `muscat` (CosMx spatial)
 
 ## Load packages 
 ```{r}
@@ -20,93 +20,88 @@ library(purrr)
 library(scater)
 library(sctransform)
 library(UpSetR)
-library(sceasy)
 library(SingleCellExperiment)
 library(Seurat)
 ```
 
 ## Load data and create SCE object 
 ```{r}
-# load seurat object which contains gene activity matrix in "GA" assay 
-atac_ga <- readRDS(here::here("Data", "GEX_ATAC_GA.rds"))
+# Load seurat object 
+cosmx <- readRDS(here::here("Data", "cosmx_metadata.rds"))
 
-# extract GA counts 
-ga_counts <- GetAssayData(atac_ga, assay = "SCT", layer = "counts")
+# extract SCT counts 
+sct_counts_cosmx <- GetAssayData(cosmx, assay = "SCT", layer = "counts")
 
 # extract metadata 
-metadata = atac_ga@meta.data
+metadata_cosmx <- cosmx@meta.data
 
-# create sce object 
-sce <- SingleCellExperiment(
-  assays = list(counts = ga_counts),
-  colData = metadata,
-  metadata = metadata
+# create singleCellExperiment object 
+sce_cosmx <- SingleCellExperiment(
+  assays = list(counts = sct_counts_cosmx),
+  colData = metadata_cosmx,
+  metadata = metadata_cosmx
 )
 
-sce
+sce_cosmx 
+
 ```
 
 ## Pre-processing 
 ```{r}
 # remove undetected genes
-sce <- sce[rowSums(counts(sce) > 0) > 0, ]
-dim(sce)
+sce_cosmx <- sce_cosmx[rowSums(counts(sce_cosmx) > 0) > 0, ]
+dim(sce_cosmx)
 
 # calculate per-cell quality control (QC) metrics
-qc <- perCellQCMetrics(sce)
+qc <- perCellQCMetrics(sce_cosmx)
 
 # remove cells with few or many detected genes
 ol <- isOutlier(metric = qc$detected, nmads = 2, log = TRUE)
-sce <- sce[, !ol]
-dim(sce)
+sce_cosmx <- sce_cosmx[, !ol]
+dim(sce_cosmx)
 
 # remove lowly expressed genes 
-sce <- sce[rowSums(counts(sce) > 1) >= 10, ]
-dim(sce)
+sce_cosmx <- sce_cosmx[rowSums(counts(sce_cosmx) > 1) >= 10, ]
+dim(sce_cosmx)
 
 # compute sum-factors & normalize
-sce <- computeLibraryFactors(sce)
-sce <- logNormCounts(sce)
+sce_cosmx <- computeLibraryFactors(sce_cosmx)
+sce_cosmx <- logNormCounts(sce_cosmx)
 
 ```
 
 ## Data preparation 
 ```{r}
-(sce <- prepSCE(sce, 
+(sce_cosmx <- prepSCE(sce_cosmx, 
     kid = "aba_classification", # subpopulation assignments
     gid = "condition",  # group IDs (ctrl/stim)
-    sid = "SampleID",   # sample IDs (ctrl/stim.1234)
+    sid = "SampleID", # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
 # store cluster + sample IDs as well as number of clusters and samples 
-nk <- length(kids <- levels(sce$cluster_id))
-ns <- length(sids <- levels(sce$sample_id))
+nk_cosmx <- length(kids <- levels(sce_cosmx$cluster_id))
+ns_cosmx <- length(sids <- levels(sce_cosmx$sample_id))
 names(kids) <- kids; names(sids) <- sids
 ```
 
 ## Data overview 
 ```{r}
 # nb. of cells per cluster-sample
-df <- t(table(sce$cluster_id, sce$sample_id))
+df <- t(table(sce_cosmx$cluster_id, sce_cosmx$sample_id))
 df
 
 ```
 
-```{r}
-
-gplots::heatmap.2(df/rowSums(df), trace="none",
-                  margins = c(10, 10))
-```
-
 ## Differential state (DS) analysis 
 ```{r}
+
 # aggregation of single-cell to pseudo-bulk data 
-pb <- aggregateData(sce,
+pb <- aggregateData(sce_cosmx,
     assay = "counts", fun = "sum",
     by = c("cluster_id", "sample_id"))
 
 # one sheet per subpopulation
-assayNames(pb)
+assay_names <- assayNames(pb)
 
 # pseudobulks for 1st subpopulation
 t(head(assay(pb)))
@@ -114,16 +109,30 @@ t(head(assay(pb)))
 # pseudobulk-level MDS plot 
 (pb_mds <- pbMDS(pb))
 
-# use very distinctive shaping of groups & change cluster colors
+
+# Manually define a set of colors (example)
+custom_colors <- c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628",
+  "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854",
+  "#FFD92F", "#E5C494", "#B3B3B3", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072",
+  "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5",
+  "#FFED6F", "#1F78B4", "#33A02C", "#6A3D9A", "#FF7F00", "#FFFF33", "#B15928"
+)
+
+# Ensure the length of custom_colors matches the number of unique groups or categories (58)
+custom_colors <- rep(custom_colors, length.out = 58)
+
+# Adjusted code with scale_color_manual
 pb_mds <- pb_mds + 
   scale_shape_manual(values = c(17, 4)) +
-  scale_color_manual(values = c(RColorBrewer::brewer.pal(8, "Set1"), RColorBrewer::brewer.pal(7, "Set2"), RColorBrewer::brewer.pal(6, "Set3"))) 
+  scale_color_manual(values = custom_colors)
+
 # change point size & alpha
 pb_mds$layers[[1]]$aes_params$size <- 5
 pb_mds$layers[[1]]$aes_params$alpha <- 0.6
 
 pb_mds <- pb_mds + 
-  geom_line(aes(group = cluster_id), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for gene activity")
+  geom_line(aes(group = interaction(cluster_id, group_id)), color = "grey", linetype = "dashed") + ggtitle("Pseudobulk-level multidimensional scaling (MDS) plot for Spatial Data")
 
 pb_mds
 ```
@@ -131,7 +140,7 @@ pb_mds
 ## Sample level analysis
 ```{r}
 # construct design & contrast matrix
-ei <- metadata(sce)$experiment_info
+ei <- metadata(sce_cosmx)$experiment_info
 ei$group_id <- relevel(ei$group_id, ref = "Saline")
 mm <- model.matrix(~ 0 + ei$group_id)
 dimnames(mm) <- list(ei$sample_id, levels(ei$group_id))
@@ -156,21 +165,20 @@ tbl_fil <- lapply(tbl, function(u) {
 
 # nb. of DS genes & % of total by cluster
 n_de <- vapply(tbl_fil, nrow, numeric(1))
-p_de <- format(n_de / nrow(sce) * 100, digits = 3)
+p_de <- format(n_de / nrow(sce_cosmx) * 100, digits = 3)
 data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
 
 # calculate expression frequencies 
-frq <- calcExprFreqs(sce, assay = "counts", th = 0)
+frq <- calcExprFreqs(sce_cosmx, assay = "counts", th = 0)
 # one sheet per cluster
 assayNames(frq)
-gids <- levels(sce$group_id)
+gids <- levels(sce_cosmx$group_id)
 frq10 <- vapply(as.list(assays(frq)), 
   function(u) apply(u[, gids] > 0.1, 1, any), 
-  logical(nrow(sce)))
+  logical(nrow(sce_cosmx)))
 t(head(frq10))
 
 ```
-
 
 ```{r}
 # second filtration step which can be done but not done for this analysis 
@@ -186,21 +194,20 @@ n_de <- vapply(tbl_fil2, nrow, numeric(1))
 p_de <- format(n_de / nrow(sce) * 100, digits = 3)
 data.frame("#DS" = n_de, "%DS" = p_de, check.names = FALSE)
 
-topfil_GA <- do.call(rbind, tbl_fil)
-top_GA <- do.call(rbind, tbl)
+topfil_cosmx <- do.call(rbind, tbl_fil)
+top_cosmx <- do.call(rbind, tbl)
 
 # plot top table 
-topfil_GA %>%
-  ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
+top_cosmx %>% 
+    ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
   geom_point() +
   geom_text_repel() +
   theme_minimal() +
   labs(
-    title = "Volcano Plot (Gene Activity)",
+    title = "Volcano Plot (Spatial Transcriptomics)",
     x = "Log Fold Change",
     y = "-Log10 P-value",
-    color = "Cluster"
-  )
+    color = "Cluster")
 
 ```
 
@@ -213,11 +220,11 @@ upset(fromList(de_gs_by_k))
 # sample level viz: Pseudobulk heatmaps
 
 # top-5 DS genes per cluster
-pbHeatmap(sce, res, top_n = 5)
+pbHeatmap(sce_cosmx, res, top_n = 5, )
 ```
 
-
 ```{r}
+# plotting expression of one gene 
 group <- factor(rep(c("fent", "sal"), each = 2))
 plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
 
@@ -226,10 +233,11 @@ plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
 
 ## Save top table 
 ```{r}
-saveRDS(topfil_GA, file = here::here("Data", "topfil_GA.rds"))
-saveRDS(top_GA, file = here::here("Data", "top_GA.rds"))
+saveRDS(topfil_cosmx, file = here::here("Data", "topfil_cosmx.rds"))
+saveRDS(top_cosmx, file = here::here("Data", "top_cosmx.rds"))
 ```
 
 ```{r}
 sessionInfo()
 ```
+

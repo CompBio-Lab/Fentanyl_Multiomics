@@ -1,0 +1,130 @@
+---
+title: "cosmx_CC_communication"
+output: html_document
+date: "2024-06-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# ScDiffCom: Differential analysis of cell-cell interactions for spatial data 
+
+## Load libraries 
+```{r}
+library(Seurat)
+library(scDiffCom)
+library(data.table)
+library(ggplot2)
+library(future)
+library(ggrepel)
+```
+
+## Load data 
+```{r}
+seurat_obj <- readRDS(here::here("Data", "cosmx_metadata.rds"))
+```
+
+## Add meta data 
+```{r}
+
+# Add condition to meta-data
+drug = rep(c("Saline", "Fentanyl", "Fentanyl", "Saline"), c(4254, 405, 2302, 1197))
+names(drug) <- colnames(x = seurat_obj)
+seurat_obj <- AddMetaData(
+  object = seurat_obj,
+  metadata = drug, 
+  col.name = 'drug')
+
+
+plan(sequential)
+```
+
+## Run differential analysis with default parameters 
+```{r}
+scdiffcom_object <- run_interaction_analysis(
+  seurat_object = seurat_obj,
+  LRI_species = "rat",
+  seurat_celltype_id = "aba_classification",
+  seurat_condition_id = list(
+    column_name = "condition",
+    cond1_name = "Saline",
+    cond2_name = "Fentanyl")
+)
+```
+
+## CCIs 
+```{r}
+# Retrieve and display all detected CCIs
+CCI_detected <- GetTableCCI(scdiffcom_object, type = "detected", simplified = TRUE)
+
+# Number of CCIs per regulation type (here with age)
+table(CCI_detected$REGULATION)
+## DOWN  FLAT   NSC    UP 
+  # 0   757    3784    196 
+
+
+# Retrieve the ORA results
+ORA_results <- GetTableORA(scdiffcom_object, categories = "all", simplified = TRUE)
+
+# Categories available
+names(ORA_results)
+## [1] "LRI"               "LIGAND_COMPLEX"    "RECEPTOR_COMPLEX" 
+## [4] "ER_CELLTYPES"      "EMITTER_CELLTYPE"  "RECEIVER_CELLTYPE"
+## [7] "GO_TERMS"          "KEGG_PWS"
+```
+
+## Plot CCIs 
+```{r}
+top_3_CCIs <- CCI_detected %>%
+  arrange(P_VALUE_DE) %>%
+  head(3)
+
+# Plot with top 3 CCIs labeled using geom_text_repel
+ggplot(
+  CCI_detected,
+  aes(
+    x = LOGFC,
+    y = -log10(P_VALUE_DE + 1E-12),
+    colour = REGULATION
+  )
+) +
+  geom_point() +
+  scale_colour_manual(
+    values = c("UP" = "red", "DOWN" = "blue", "FLAT" = "green", "NSC" = "grey")
+  ) +
+  xlab("log(FC)") +
+  ylab("-log10(p-value)") +
+  ggtitle("Volcano Plot of Detected CCIs") +
+  geom_text_repel(
+    data = top_3_CCIs,
+    aes(label = CCI),
+    size = 3,
+    nudge_y = 1, # nudges the label vertically to avoid overlap
+    max.overlaps = Inf # ensures all labels are plotted
+  )
+```
+
+## Plot the most over-represented up-regulated LRIs
+```{r}
+
+# PlotORA returns a ggplot object that you can further optimize (e.g. here to place the legend)
+PlotORA(
+  object = scdiffcom_object,
+  category = "LRI",
+  regulation = "FLAT"
+) + theme(
+  legend.position = c(0.85, 0.4),
+  legend.key.size = unit(0.4, "cm")
+)
+```
+
+## Build Network of cell-cell communications 
+```{r}
+BuildNetwork(
+  object = scdiffcom_object
+)
+
+```
+
+
