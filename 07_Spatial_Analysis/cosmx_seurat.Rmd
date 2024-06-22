@@ -228,4 +228,9 @@ ImageDimPlot(cosmx_subset, fov = "rat_brain", axes = TRUE, cols = "glasbey",
 
 ```
 
+## Save cosmx seurat object 
+```{r}
+saveRDS(cosmx, file = here::here("Data", "cosmx.rds"))
+```
+
 

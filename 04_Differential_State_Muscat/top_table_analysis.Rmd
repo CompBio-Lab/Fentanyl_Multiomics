@@ -15,7 +15,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ComplexHeatmap)
 library(dplyr)
 library(circlize)
-library(mixOmics) 
 library(tidyr)
 ```
 
@@ -195,9 +194,10 @@ Heatmap(counts_matrix,
 
 ```
 
+
 ## Find the intersecting genes 
 ```{r}
-# Find intersecting genes for each cell type and store in a nested column
+# Find unique intersecting genes for each cell type and store in a nested column
 intersect_genes_df <- top_ga %>%
   filter(gene %in% top_gex$gene) %>%
   group_by(cluster_id) %>%
@@ -207,7 +207,6 @@ intersect_genes_df <- top_ga %>%
 # Check the resulting dataframe
 print(intersect_genes_df)
 
-#C1qb, Helb
 ```
 
 # Bar plot 
@@ -234,7 +233,7 @@ ggplot(bar_data, aes(x = category, y = count, fill = category)) +
             size = 3.5, 
             hjust = 0.5, 
             position = position_stack(vjust = 0.5)) +
-  labs(title = "Number of Up and Down Regulated Genes in Each Dataset",
+  labs(title = "Number of genes in each dataset",
        x = "Gene Categories",
        y = "Number of Genes") +
   theme_minimal() +
@@ -242,5 +241,63 @@ ggplot(bar_data, aes(x = category, y = count, fill = category)) +
 
 ```
 
-# plot the intersecting genes 
+
+# plot the intersecting gene
+```{r}
+# Define the intersecting genes
+gene <- "Ugt8"
+
+cells <- gex$aba_classification[gex$aba_classification == "CB Granule Glut"]
+
+
+plot_data <- data.frame(gene = gex@assays$SCT@data[gene, cells], ga = ga@assays$SCT@data[gene, cells], drug = gex@meta.data[ cells, 'condition'])
+
+
+p <- ggplot(plot_data, aes(x = ga, y = gene, color = drug)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +  # Add line of best fit
+  labs(title = paste("Gene:", gene), x = "Gene Activity", y = "Gene Expression") +
+  theme_minimal()
+
+```
+
+## Plot all of the intersecting genes 
+```{r}
+gex_df <- gex@assays$SCT@data[rownames(gex@assays$SCT@data) %in% intersect_genes, names(cells)] %>% 
+  as.matrix()
+ga_df <- ga@assays$SCT@data[rownames(ga@assays$SCT@data) %in% intersect_genes, names(cells)] %>% 
+  as.matrix()
+
+gex_df_final <- gex_df %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "genes") %>% 
+  as_tibble() %>%
+  pivot_longer(cols = !genes, names_to = "cells", values_to = "gex")
+
+ga_df_final <- ga_df %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "genes") %>% 
+  as_tibble() %>%
+  pivot_longer(cols = !genes, names_to = "cells", values_to = "ga")
+
+joined_df <- left_join(gex_df_final, ga_df_final, by = c("genes", "cells"))
+metadata_df <- gex@meta.data[names(cells), ] %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "cells") %>% 
+  as_tibble() %>% select(cells, condition)
+
+final_df <- left_join(joined_df, metadata_df, by = "cells")
+
+top6 <- final_df$genes %>% unique %>% tail(6)
+
+final_df %>% 
+  filter(genes %in% top6) %>%
+  ggplot(aes(x = ga, y = gex, colour = condition)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +  # Add line of best fit
+  facet_wrap(~genes) + 
+  #labs(title = paste("Gene:", genes), x = "Gene Activity", y = "Gene Expression") +
+  theme_minimal()
+
+```
 

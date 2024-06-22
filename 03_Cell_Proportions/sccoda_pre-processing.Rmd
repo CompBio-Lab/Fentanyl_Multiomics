@@ -34,7 +34,7 @@ GEX_ATAC_seur <- readRDS(here::here("Data", "GEX_ATAC_Seur.rds"))
 # Create a column in metadata called SampleID with same info as orig.ident 
 GEX_ATAC_seur@meta.data$SampleID <- GEX_ATAC_seur@meta.data$orig.ident
 
-# Create a column in metadata called cell_type with cell types in cluster_annotations (csv can be found in clustering_and_annotation folder) 
+# Create a column in metadata called cell_type with cell types in cluster_annotations
 
 cell_types <- c("CB Granule Glut","Oligo NN", "PGRN-PARN-MDRN Hoxb5 Glut", "Endo NN", "Bergmann NN", "Astro-CB NN", "CB PLI Gly-Gaba", "CBX MLI Megf11 Gaba", "SPVI-SPVC Sall3 Nfib Gly-Gaba", "SPVI-SPVC Tlx3 Ebf3 Glut", "Astro-NT NN", "CBX MLI Cdh22 Gaba", "VLMC NN", "OPC NN", "PG-TRN-LRN Fat2 Glut", "PARN-MDRNd-NTS Gbx2 Gly-Gaba", "MY Lhx1 Gly-Gaba",  "SPVI-SPVC Sall3 Lhx1 Gly-Gaba", "DCO UBC Glut",  "CBX Purkinje Gaba" , "CBX Golgi Gly-Gaba")
 

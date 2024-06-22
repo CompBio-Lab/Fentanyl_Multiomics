@@ -1,0 +1,69 @@
+---
+title: "cosmx_sccoda"
+output: html_document
+date: "2024-06-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Cell type proportions for spatial data (CosMx)
+
+# Load libraries 
+```{r}
+library(dplyr)
+library(Seurat)
+library(SeuratObject)
+library(hdf5r)
+library(ggplot2)
+library(tidyr)
+library(fgsea)
+library(SeuratData)
+library(SeuratDisk)
+```
+
+## Load cosmx seurat object 
+```{r}
+cosmx <- readRDS(here::here("Data", "cosmx.rds"))
+```
+
+
+## Add meta data with correct column names 
+```{r}
+# load fov annotations 
+fov_annotations <- read.csv(here::here("Data", "fov_annotations.csv"))
+fov_annotations$fov <- as.character(fov_annotations$fov)
+
+# Extract the fov information from the Seurat object
+fov_info <- gsub("^0_", "", colnames(cosmx))
+
+# Add the fov info as a new column in the Seurat object's metadata
+cosmx <- AddMetaData(cosmx, fov_info, col.name = "fov")
+
+# Join the fov annotations to get sample IDs
+# Convert to data frame for easy manipulation
+metadata_df <- cosmx@meta.data %>%
+  left_join(fov_annotations, by = c("fov" = "fov"))
+
+# Ensure that the new metadata column is added to the Seurat object
+cosmx@meta.data <- metadata_df
+
+names(cosmx@meta.data)[names(cosmx@meta.data) == "id"] <- "SampleID"
+names(cosmx@meta.data)[names(cosmx@meta.data) == "Sex"] <- "sex"
+names(cosmx@meta.data)[names(cosmx@meta.data) == "Condition"] <- "condition"
+```
+
+## Save seurat object as h5ad for sccoda analysis in python 
+```{r}
+# v5 of seurat makes the RNA assay at assayv5 but if you need to convert to anndata for sccoda it needs to be "assay" and not assayv5 hence run: 
+cosmx@assays$RNA <- as(object = cosmx@assays$RNA, Class = "Assay")
+
+
+# Save object as h5ad for input into sccoda 
+SaveH5Seurat(cosmx, filename = here::here("Data", "cosmx.h5Seurat"))
+Convert(here::here("Data", "cosmx.h5Seurat"), dest = "h5ad", overwrite = TRUE)
+
+# Save gex_atac as rds 
+saveRDS(cosmx, file = here::here("Data", "cosmx_metadata.rds"))
+```
