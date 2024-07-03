@@ -47,7 +47,7 @@ scdiffcom_object <- run_interaction_analysis(
   LRI_species = "rat",
   seurat_celltype_id = "aba_classification",
   seurat_condition_id = list(
-    column_name = "drug",
+    column_name = "condition",
     cond1_name = "Saline",
     cond2_name = "Fentanyl")
 )
@@ -58,11 +58,16 @@ scdiffcom_object <- run_interaction_analysis(
 # Retrieve and display all detected CCIs
 CCI_detected <- GetTableCCI(scdiffcom_object, type = "detected", simplified = TRUE)
 
+CCI_filtered <-  CCI_detected %>% filter(P_VALUE_DE < 0.01)
+
 # Number of CCIs per regulation type (here with age)
 table(CCI_detected$REGULATION)
 ## DOWN  FLAT   NSC    UP 
   # 0   757    3784    196 
 
+table(CCI_filtered$REGULATION)
+## NSC   UP
+ # 253.  196
 
 # Retrieve the ORA results
 ORA_results <- GetTableORA(scdiffcom_object, categories = "all", simplified = TRUE)
@@ -76,13 +81,13 @@ names(ORA_results)
 
 ## Plot CCIs 
 ```{r}
-top_3_CCIs <- CCI_detected %>%
+top_3_CCIs <- CCI_filtered %>%
   arrange(P_VALUE_DE) %>%
   head(3)
 
 # Plot with top 3 CCIs labeled using geom_text_repel
 ggplot(
-  CCI_detected,
+  CCI_filtered,
   aes(
     x = LOGFC,
     y = -log10(P_VALUE_DE + 1E-12),
@@ -112,7 +117,7 @@ ggplot(
 PlotORA(
   object = scdiffcom_object,
   category = "LRI",
-  regulation = "FLAT"
+  regulation = "UP"
 ) + theme(
   legend.position = c(0.85, 0.4),
   legend.key.size = unit(0.4, "cm")

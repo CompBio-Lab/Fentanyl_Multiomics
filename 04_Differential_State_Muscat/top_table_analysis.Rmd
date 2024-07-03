@@ -27,7 +27,7 @@ top_ga <- readRDS(here::here("Data", "topfil_GA.rds"))
 ## Getting counts for each dataset 
 ```{r}
 #GEX counts 
-top_gex <- top_gex %>% filter(p_adj.loc < 0.25)
+#top_gex <- top_gex %>% filter(p_adj.loc < 0.25)
 
 # Process GEX dataset
 df_gex <- top_gex %>%
@@ -57,7 +57,7 @@ gene_counts <- df_gex %>%
   #mutate(dataset = "atac")
   
 # GA Counts 
-top_ga <- top_ga %>% filter(p_adj.loc < 0.60)
+#top_ga <- top_ga %>% filter(p_adj.loc < 0.60)
 
 # Process GA dataset
 df_ga <- top_ga %>%
@@ -209,7 +209,7 @@ print(intersect_genes_df)
 
 ```
 
-# Bar plot 
+## Bar plot 
 ```{r}
 # Define the intersect genes for annotation
 intersect_genes <- top_gex %>%
@@ -222,10 +222,10 @@ bar_data <- data.frame(
   count = c(sum(!top_ga$gene %in% top_gex$gene), 
             length(intersect_genes), 
             sum(!top_gex$gene %in% top_ga$gene)),
-  genes = c(NA, paste(intersect_genes, collapse = ", "), NA)  # Add gene names for intersect
+  genes = c(NA, paste(head(intersect_genes, 5), collapse = ", "), NA)  # Only first 5 genes
 )
 
-# Create the bar plot
+# Create the bar plot with only the first five gene names
 ggplot(bar_data, aes(x = category, y = count, fill = category)) +
   geom_bar(stat = "identity") +
   geom_text(aes(label = genes), 
@@ -238,14 +238,69 @@ ggplot(bar_data, aes(x = category, y = count, fill = category)) +
        y = "Number of Genes") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
+```
 
+## Bar plot with up regulated intersect genes labelled 
+```{r}
+# Filter to keep only upregulated genes for labels
+top_gex_up <- top_gex %>%
+  filter(reg == "UP")
+
+# Define the intersect genes for annotation (all genes)
+intersect_genes <- top_gex %>%
+  filter(gene %in% top_ga$gene) %>%
+  pull(gene)
+
+# Prepare data for bar plot
+bar_data <- data.frame(
+  category = rep(c("Only GA", "Intersect", "Only GEX"), each = 1),
+  count = c(sum(!top_ga$gene %in% top_gex$gene), 
+            length(intersect_genes), 
+            sum(!top_gex$gene %in% top_ga$gene)),
+  genes = c(NA, paste(head(intersect_genes[intersect_genes %in% top_gex_up$gene], 5), collapse = ", "), NA)  # Only first 5 upregulated intersect genes
+)
+
+# Create the bar plot with only the first five upregulated gene names
+ggplot(bar_data, aes(x = category, y = count, fill = category)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = genes), 
+            vjust = -0.5, 
+            size = 3.5, 
+            hjust = 0.5, 
+            position = position_stack(vjust = 0.5)) +
+  labs(title = "Number of genes in each dataset",
+       x = "Gene Categories",
+       y = "Number of Genes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 
-# plot the intersecting gene
+
+## Volcano Plots 
+```{r}
+EnhancedVolcano(top_gex,
+                lab = top_gex$gene,     # Column with gene names
+                x = 'logFC',            # Column containing log fold changes
+                y = 'p_adj.loc',          # Column containing p-values
+                title = 'Volcano plot of top_gex',
+                pCutoff = 0.05,         # Adjust this threshold based on your analysis
+                FCcutoff = 1.5,         # Adjust this threshold based on your analysis
+                pointSize = 3.0,        # Size of the points
+                labSize = 4.0,          # Size of the gene labels
+                col = c('grey30', 'forestgreen', 'royalblue', 'red2'),  # Colors for points
+                legendLabels = c('NS', 'Log2 FC', 'P-value', 'P-value & Log2 FC'),
+                legendPosition = 'right',
+                drawConnectors = TRUE,    # Draw lines connecting points to labels
+                widthConnectors = 0.5,    # Width of the connector lines
+                colConnectors = 'grey50') # Color of the connector lines
+```
+
+
+## plot the intersecting gene
 ```{r}
 # Define the intersecting genes
-gene <- "Ugt8"
+gene <- "Ctss"
 
 cells <- gex$aba_classification[gex$aba_classification == "CB Granule Glut"]
 
