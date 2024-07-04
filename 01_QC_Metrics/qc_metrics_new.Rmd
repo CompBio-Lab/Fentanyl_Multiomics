@@ -207,11 +207,11 @@ after_filter <- table(Idents(rna_atac))
 ## Add drug info to metadata 
 ```{r}
 demo <- data.frame(ids = c("r3", "r4", "r15", "r16"),
-                       drug = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
+                       condition = c("Saline", "Fentanyl", "Fentanyl", "Saline"), 
                        sex = c("Male", "Male", "Female", "Female"))
 demo_10x <- rna_atac@meta.data %>% tibble::rownames_to_column("ids") %>% mutate(ids = gsub("_.*", "", ids))
 demo_10x <- demo_10x %>% left_join(demo, by = "ids")
-new_metadata <- demo_10x[, c("drug", "sex")]
+new_metadata <- demo_10x[, c("condition", "sex", "ids")]
 
 rna_atac <- AddMetaData(object = rna_atac, metadata = new_metadata)
 
@@ -221,7 +221,7 @@ rna_atac <- AddMetaData(object = rna_atac, metadata = new_metadata)
 
 ## Save Seurat object 
 ```{r}
-saveRDS(rna, file = here::here("Data", "GEX_ATAC.rds"))
+saveRDS(rna_atac, file = here::here("Data", "GEX_ATAC.rds"))
 ```
 
 
