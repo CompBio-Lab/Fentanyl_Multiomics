@@ -5,7 +5,7 @@
 ## Introduction 
 This repository includes SnRNAseq and SnATACseq analysis pipeline on the rat midbrain after fentanyl self-administration. This includes the data processing (fastqc, cellranger) and the following downstream analysis: 
 * QC metrics 
-* Cell type annotation (MultiVI) 
+* WNN Analysis of 10x Multiome (Seurat) and cell type annotation (MapMyCells)
 * Cell proportions (scCODA) 
 * Cell specific differential state analysis (Muscat) 
 * Enriched Pathways (EnrichR)
