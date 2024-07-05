@@ -74,8 +74,8 @@ sce <- logNormCounts(sce)
 ```{r}
 (sce <- prepSCE(sce, 
     kid = "aba_classification", # subpopulation assignments
-    gid = "condition",  # group IDs (ctrl/stim)
-    sid = "SampleID", # sample IDs (ctrl/stim.1234)
+    gid = "drug",  # group IDs (ctrl/stim)
+    sid = "orig.ident", # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
 # store cluster + sample IDs as well as number of clusters and samples 
@@ -133,16 +133,35 @@ dimnames(mm) <- list(ei$sample_id, levels(ei$group_id))
 contrast <- makeContrasts("Fentanyl-Saline", levels = mm)
 
 # run DS analysis
-res <- pbDS(pb, design = mm, contrast = contrast, method="limma-voom")
+res <- pbDS(pb, design = mm, contrast = contrast, method="limma-voom", min_cells = 3)
 
 # acess results table
 tbl <- res$table$`Fentanyl-Saline`
 ```
 
+## plot results
+
+```{r}
+df <- lapply(tbl, function(i){
+  i %>% 
+    arrange(p_val) %>% 
+    mutate(n = 1:n())
+}) %>% 
+  do.call(rbind, .)
+
+df %>% 
+  ggplot(aes(x = n, y = p_adj.loc, color = cluster_id)) +
+  geom_line() +
+  scale_x_log10() +
+  theme_classic() +
+  facet_wrap(~cluster_id)
+```
+
+
 ## Handling results 
 ```{r}
 # results filtering and overview 
-# filter FDR < 5%, abs(logFC) > 1 & sort by adj. p-value
+# filter FDR < 30% & sort by adj. p-value
 tbl_fil <- lapply(tbl, function(u) {
   u_filtered <- subset(u, p_adj.loc < 0.3)
   u_filtered <- dplyr::arrange(u_filtered, p_adj.loc)
@@ -184,7 +203,7 @@ topfil_GEX <- do.call(rbind, tbl_fil)
 top_GEX <- do.call(rbind, tbl)
 
 # plot top table 
-top %>% 
+topfil_GEX %>% 
     ggplot(aes(x = logFC, y = -log10(p_val), color = cluster_id, label = gene)) +
   geom_point() +
   geom_text_repel() +
@@ -200,7 +219,7 @@ top %>%
 ## Visualize results 
 ```{r}
 # between cluster concordance 
-de_gs_by_k <- map(tbl_fil, "gene")
+de_gs_by_k <- purrr::map(tbl_fil, "gene")
 upset(fromList(de_gs_by_k))
 
 # sample level viz: Pseudobulk heatmaps
@@ -210,11 +229,11 @@ pbHeatmap(sce, res, top_n = 5, )
 ```
 
 ```{r}
-# plotting expression of one gene 
-group <- factor(rep(c("fent", "sal"), each = 2))
-plot(voom(assays(pb)$Endo_Flt1_Lrg1_1)$E["Lrrtm4", ] ~ group)
-
-plot(assays(pb)$Endo_Flt1_Lrg1_1["Lrrtm4", ] ~ group)
+plotExpression(sce[, sce$cluster_id == "CB Granule Glut"],
+  features = tbl_fil$`CB Granule Glut`$gene[seq_len(6)],
+  x = "sample_id", colour_by = "group_id", ncol = 3) +
+  guides(fill = guide_legend(override.aes = list(size = 5, alpha = 1))) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Save top table 

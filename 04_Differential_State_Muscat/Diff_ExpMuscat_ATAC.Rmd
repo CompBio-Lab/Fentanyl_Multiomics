@@ -76,8 +76,8 @@ sce <- logNormCounts(sce)
 ```{r}
 (sce <- prepSCE(sce, 
     kid = "aba_classification", # subpopulation assignments
-    gid = "condition",  # group IDs (ctrl/stim)
-    sid = "SampleID",   # sample IDs (ctrl/stim.1234)
+    gid = "drug",  # group IDs (ctrl/stim)
+    sid = "orig.ident", # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
 # store cluster + sample IDs as well as number of clusters and samples 
@@ -142,11 +142,30 @@ dimnames(mm) <- list(ei$sample_id, levels(ei$group_id))
 contrast <- makeContrasts("Fentanyl-Saline", levels = mm)
 
 # run DS analysis
-res <- pbDS(pb, design = mm, contrast = contrast, method="limma-voom")
+res <- pbDS(pb, design = mm, contrast = contrast, method="limma-voom", min_cells = 3)
 
 # acess results table
 tbl <- res$table$`Fentanyl-Saline`
 ```
+
+## plot results
+
+```{r}
+df <- lapply(tbl, function(i){
+  i %>% 
+    arrange(p_val) %>% 
+    mutate(n = 1:n())
+}) %>% 
+  do.call(rbind, .)
+
+df %>% 
+  ggplot(aes(x = n, y = p_adj.loc, color = cluster_id)) +
+  geom_line() +
+  scale_x_log10() +
+  theme_classic() +
+  facet_wrap(~cluster_id)
+```
+
 
 ## Handling results 
 ```{r}
@@ -210,7 +229,7 @@ topfil_ATAC <- topfil_ATAC %>%
 
 # left join query regions (from closest_genes) with regions that are differentially expressed (in differentially expressed peaks) and add the genes from the gene col into top table. 
 topfil_ATAC <- left_join(topfil_ATAC, 
-                         closest_genes %>% select(query_region, gene_name), 
+                         closest_genes %>% dplyr::select(query_region, gene_name), 
                          by = c("regions" = "query_region"))
 ```
 
