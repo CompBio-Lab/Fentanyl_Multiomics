@@ -221,7 +221,7 @@ rna_atac <- AddMetaData(object = rna_atac, metadata = new_metadata)
 
 ## Save Seurat object 
 ```{r}
-saveRDS(rna, file = here::here("Data", "GEX_ATAC.rds"))
+saveRDS(rna_atac, file = here::here("Data", "GEX_ATAC.rds"))
 ```
 
 

@@ -16,13 +16,56 @@ library(ComplexHeatmap)
 library(dplyr)
 library(circlize)
 library(tidyr)
+library(ggVennDiagram)
 ```
 
 ## Load 3 top tables (gex, atac and gene activity)
 ```{r}
 top_gex <- readRDS(here::here("Data", "topfil_GEX.rds"))
+top_gex$dataset <- "GEX"
 top_ga <- readRDS(here::here("Data", "topfil_GA.rds"))
+top_ga$dataset <- "GA"
 ```
+
+## overlpa
+
+## 
+
+```{r}
+cb_gran_glut <- list(GA = top_ga$gene[top_ga$cluster_id == "CB Granule Glut"],
+                     GEX = top_gex$gene[top_gex$cluster_id == "CB Granule Glut"])
+ggVennDiagram(cb_gran_glut) + scale_fill_gradient(low="grey90",high = "red")
+```
+
+```{r}
+int <- Reduce(intersect, cb_gran_glut)
+
+rbind(top_gex, top_ga) %>% 
+  dplyr::filter(gene %in% int & cluster_id == "CB Granule Glut") %>% 
+  ggplot(aes(y = gene, x = logFC, fill = dataset)) +
+  geom_bar(stat="identity", position = "dodge")
+  
+  
+```
+
+
+## CBX Purkinje Gaba
+
+```{r}
+cbx_purkinjie <- list(GA = top_ga$gene[top_ga$cluster_id == "CBX Purkinje Gaba"],
+                     GEX = top_gex$gene[top_gex$cluster_id == "CBX Purkinje Gaba"])
+ggVennDiagram(cbx_purkinjie) + scale_fill_gradient(low="grey90",high = "red")
+```
+```{r}
+int <- Reduce(intersect, cbx_purkinjie)
+
+rbind(top_gex, top_ga) %>% 
+  dplyr::filter(gene %in% int & cluster_id == "CBX Purkinje Gaba") %>% 
+  ggplot(aes(y = gene, x = logFC, fill = dataset)) +
+  geom_bar(stat="identity", position = "dodge")
+  
+```
+
 
 ## Getting counts for each dataset 
 ```{r}
@@ -32,7 +75,7 @@ top_ga <- readRDS(here::here("Data", "topfil_GA.rds"))
 # Process GEX dataset
 df_gex <- top_gex %>%
   mutate(dataset = "gex") %>%
-  select(cluster_id, dataset, logFC) %>%
+  dplyr::select(cluster_id, dataset, logFC) %>%
   mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
 
 gene_counts <- df_gex %>%
@@ -62,7 +105,7 @@ gene_counts <- df_gex %>%
 # Process GA dataset
 df_ga <- top_ga %>%
   mutate(dataset = "ga") %>%
-  select(cluster_id, dataset, logFC) %>%
+  dplyr::select(cluster_id, dataset, logFC) %>%
   mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
 
 ga_counts <- df_ga %>%
@@ -172,7 +215,7 @@ counts_df <- counts_df %>%
     only_gex_genes = only_gex_genes + only_gex_genes_gex,        # Combine only_gex counts
     only_ga_genes = only_ga_genes + only_ga_genes_ga             # Combine only_ga counts
   ) %>%
-  select(cluster_id, only_gex_genes, intersect_genes, only_ga_genes)
+  dplyr::select(cluster_id, only_gex_genes, intersect_genes, only_ga_genes)
 
 # Convert to matrix
 counts_matrix <- as.matrix(counts_df[, -1])
@@ -183,7 +226,7 @@ print(counts_gex)
 print(counts_ga)
 
 # Create the heatmap
-Heatmap(counts_matrix,
+Heatmap(counts_matrix/rowSums(counts_matrix),
         name = "Number of Genes",
         row_title = "Cell Types",
         column_title = "Gene Categories",
@@ -199,7 +242,7 @@ Heatmap(counts_matrix,
 ```{r}
 # Find unique intersecting genes for each cell type and store in a nested column
 intersect_genes_df <- top_ga %>%
-  filter(gene %in% top_gex$gene) %>%
+  dplyr::filter(gene %in% top_gex$gene) %>%
   group_by(cluster_id) %>%
   summarise(intersect_genes = list(gene)) %>%
   ungroup()
@@ -213,7 +256,7 @@ print(intersect_genes_df)
 ```{r}
 # Define the intersect genes for annotation
 intersect_genes <- top_gex %>%
-  filter(gene %in% top_ga$gene) %>%
+  dplyr::filter(gene %in% top_ga$gene) %>%
   pull(gene)
 
 # Prepare data for bar plot

@@ -50,18 +50,18 @@ atac <- SCTransform(atac)
 ## Call Peaks 
 ```{r}
 # in order for call peaks to run, you must have MACS2 which can be downloaded by using the conda - "conda install bioconda::macs2" or pip - "pip install MACS2". 
-peaks <- CallPeaks(
-  object = atac
-)
+# peaks <- CallPeaks(
+#   object = atac
+# )
 ```
 
 ## Coverage Plot 
 ```{r}
-CoveragePlot(
-  object = atac,
-  region = "1-573693-574003",
-  ranges = peaks
-)
+# CoveragePlot(
+#   object = atac,
+#   region = "1-573693-574003",
+#   ranges = peaks
+# )
 ```
 
 ## Save rds 

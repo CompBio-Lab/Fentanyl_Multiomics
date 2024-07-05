@@ -122,7 +122,7 @@ aba_cellann <- rna_atac$aba_classification %>% table()
 celltypes_more20 <- aba_cellann[aba_cellann > 20] |> names()
 
 keep_cellann <- rna_atac@meta.data %>%
-                filter(aba_classification$subclass_label %in% more_20_celltypes)
+                dplyr::filter(aba_classification$subclass_label %in% celltypes_more20)
 
 rna_atac <- subset(rna_atac, cells = rownames(keep_cellann))
 overlap <- table(rna_atac$aba_classification, rna_atac$seurat_clusters)
@@ -149,7 +149,7 @@ markers <- markers %>%
 table(markers$cluster)
 
 # heatmap showing gene markers for each cluster for multiome data 
-DoHeatmap(gex_atac, features = markers$gene, assay = "SCT", angle = 90, size = 1.5, vjust = 0.6, hjust = 0.2) + NoLegend() + theme(axis.text.y = element_text(size = 5.5, face = "bold")) 
+DoHeatmap(rna_atac, features = markers$gene, assay = "SCT", angle = 90, size = 1.5, vjust = 0.6, hjust = 0.2) + NoLegend() + theme(axis.text.y = element_text(size = 5.5, face = "bold")) 
 ```
 
 ```{r}
