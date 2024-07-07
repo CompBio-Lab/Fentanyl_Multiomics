@@ -22,6 +22,7 @@ library(sctransform)
 library(UpSetR)
 library(SingleCellExperiment)
 library(Seurat)
+library(ggrepel)
 ```
 
 ## Load data and create SCE object 
@@ -74,7 +75,7 @@ sce <- logNormCounts(sce)
 ```{r}
 (sce <- prepSCE(sce, 
     kid = "aba_classification", # subpopulation assignments
-    gid = "drug",  # group IDs (ctrl/stim)
+    gid = "condition",  # group IDs (ctrl/stim)
     sid = "orig.ident", # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
@@ -154,7 +155,7 @@ df %>%
   geom_line() +
   scale_x_log10() +
   theme_classic() +
-  facet_wrap(~cluster_id)
+  facet_wrap(~cluster_id) + ggtitle("Adjusted P-values for cell types (RNA)")
 ```
 
 

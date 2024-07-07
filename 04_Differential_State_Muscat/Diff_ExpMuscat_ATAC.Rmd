@@ -76,7 +76,7 @@ sce <- logNormCounts(sce)
 ```{r}
 (sce <- prepSCE(sce, 
     kid = "aba_classification", # subpopulation assignments
-    gid = "drug",  # group IDs (ctrl/stim)
+    gid = "condition",  # group IDs (ctrl/stim)
     sid = "orig.ident", # sample IDs (ctrl/stim.1234)
     drop = TRUE))  # drop all other colData columns
 
@@ -163,7 +163,7 @@ df %>%
   geom_line() +
   scale_x_log10() +
   theme_classic() +
-  facet_wrap(~cluster_id)
+  facet_wrap(~cluster_id) + ggtitle("Adjusted P-values for cell types (ATAC)")
 ```
 
 
@@ -194,7 +194,6 @@ t(head(frq10))
 
 ```
 
-## No differentially expressed fragments found so analysis was stopped here. However, the following steps can be done if significant results were found. 
 
 ```{r}
 # generation of top table 
