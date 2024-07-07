@@ -22,55 +22,20 @@ library(ggVennDiagram)
 ## Load 3 top tables (gex, atac and gene activity)
 ```{r}
 top_gex <- readRDS(here::here("Data", "topfil_GEX.rds"))
-top_gex$dataset <- "GEX"
 top_ga <- readRDS(here::here("Data", "topfil_GA.rds"))
-top_ga$dataset <- "GA"
-```
-
-## overlpa
-
-## 
-
-```{r}
-cb_gran_glut <- list(GA = top_ga$gene[top_ga$cluster_id == "CB Granule Glut"],
-                     GEX = top_gex$gene[top_gex$cluster_id == "CB Granule Glut"])
-ggVennDiagram(cb_gran_glut) + scale_fill_gradient(low="grey90",high = "red")
-```
-
-```{r}
-int <- Reduce(intersect, cb_gran_glut)
-
-rbind(top_gex, top_ga) %>% 
-  dplyr::filter(gene %in% int & cluster_id == "CB Granule Glut") %>% 
-  ggplot(aes(y = gene, x = logFC, fill = dataset)) +
-  geom_bar(stat="identity", position = "dodge")
-  
-  
+top_atac <- readRDS(here::here("Data", "topfil_ATAC.rds"))
 ```
 
 
-## CBX Purkinje Gaba
-
+## filter atac and ga to only have the 2 cell types that are common (CB Granule Glut and CBX Purkinje Gaba)
 ```{r}
-cbx_purkinjie <- list(GA = top_ga$gene[top_ga$cluster_id == "CBX Purkinje Gaba"],
-                     GEX = top_gex$gene[top_gex$cluster_id == "CBX Purkinje Gaba"])
-ggVennDiagram(cbx_purkinjie) + scale_fill_gradient(low="grey90",high = "red")
-```
-```{r}
-int <- Reduce(intersect, cbx_purkinjie)
-
-rbind(top_gex, top_ga) %>% 
-  dplyr::filter(gene %in% int & cluster_id == "CBX Purkinje Gaba") %>% 
-  ggplot(aes(y = gene, x = logFC, fill = dataset)) +
-  geom_bar(stat="identity", position = "dodge")
-  
+top_ga <- top_ga[top_ga$cluster_id %in% c("CB Granule Glut", "CBX Purkinje Gaba"), ]
+top_atac <- top_atac[top_atac$cluster_id %in% c("CB Granule Glut", "CBX Purkinje Gaba"), ]
 ```
 
-
-## Getting counts for each dataset 
+## Number of DEGs (up and down) in eacah dataset for CB Glut and CBX Purkinje
 ```{r}
-#GEX counts 
-#top_gex <- top_gex %>% filter(p_adj.loc < 0.25)
+# Obtain counts for each dataset 
 
 # Process GEX dataset
 df_gex <- top_gex %>%
@@ -84,23 +49,19 @@ gene_counts <- df_gex %>%
   pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
   mutate(dataset = "gex")
 
-# ATAC Counts (filter for only one cell type as top_ga and top_gex only have DEGs for this one cell type)
-#top_atac <- top_atac %>% filter(p_adj.loc < 0.20) %>% filter(cluster_id == "CB Granule Glut")
 
 # Process ATAC dataset
-#df_atac <- top_atac %>%
-  #mutate(dataset = "atac") %>%
-  #select(cluster_id, dataset, logFC) %>%
-  #mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
+df_atac <- top_atac %>%
+  mutate(dataset = "atac") %>%
+  select(cluster_id, dataset, logFC) %>%
+  mutate(regulation = ifelse(logFC > 0, "UP", "DOWN"))
 
-#atac_counts <- df_atac %>%
-  #group_by(cluster_id, regulation) %>%
-  #summarise(count = n()) %>%
-  #pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
-  #mutate(dataset = "atac")
+atac_counts <- df_atac %>%
+  group_by(cluster_id, regulation) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
+  mutate(dataset = "atac")
   
-# GA Counts 
-#top_ga <- top_ga %>% filter(p_adj.loc < 0.60)
 
 # Process GA dataset
 df_ga <- top_ga %>%
@@ -114,13 +75,8 @@ ga_counts <- df_ga %>%
   pivot_wider(names_from = regulation, values_from = count, values_fill = 0) %>%
   mutate(dataset = "ga")
 
-```
-
-## Plotting heatmap showing number of genes that are up- and down-regulated for each cell type within the three datasets
-```{r}
-
 # Combine datasets and ensure correct aggregation
-combined_counts <- bind_rows(gene_counts, ga_counts)
+combined_counts <- bind_rows(gene_counts, ga_counts, atac_counts)
 
 # Aggregate counts to avoid duplicates
 aggregated_counts <- combined_counts %>%
@@ -165,7 +121,58 @@ Heatmap(
   column_title = "Number of up and down regulated genes in each dataset"
 )
 
+
 ```
+
+## Overlap - number of genes overlap between the 3 datasets
+
+## CB Granule Glut
+
+```{r}
+cb_gran_glut <- list(GA = top_ga$gene[top_ga$cluster_id == "CB Granule Glut"],
+                     GEX = top_gex$gene[top_gex$cluster_id == "CB Granule Glut"],
+                     ATAC = top_atac$gene_name[top_atac$cluster_id == "CB Granule Glut"])
+
+ggVennDiagram(cb_gran_glut) + scale_fill_gradient(low="grey90",high = "red") + ggtitle("Number of common genes in CB Granule Glut")
+```
+
+```{r}
+int <- Reduce(intersect, cb_gran_glut)
+
+# Add "dataset" column to each of the top tables 
+top_gex <- top_gex %>% mutate(dataset = "GEX")
+top_ga <- top_ga %>% mutate(dataset = "GA")
+top_atac <- top_atac %>% mutate(dataset = "ATAC")
+
+# make the top_atac df the same as the other df's in terms of column names 
+top_atac <- top_atac %>% 
+  mutate(gene = gene_name) %>% 
+  select(-gene_name, -regions)
+
+rbind(top_gex, top_ga, top_atac) %>% 
+  dplyr::filter(gene %in% int & cluster_id == "CB Granule Glut") %>% 
+  ggplot(aes(y = gene, x = logFC, fill = dataset)) +
+  geom_bar(stat="identity", position = "dodge") + ggtitle("Down-regulation of common genes in CB Granule Glut")
+
+  
+```
+
+
+## CBX Purkinje Gaba
+```{r}
+cbx_purkinjie <- list(GA = top_ga$gene[top_ga$cluster_id == "CBX Purkinje Gaba"],
+                     GEX = top_gex$gene[top_gex$cluster_id == "CBX Purkinje Gaba"],
+                     ATAC = top_atac$gene[top_atac$cluster_id == "CBX Purkinje Gaba"])
+
+ggVennDiagram(cbx_purkinjie) + scale_fill_gradient(low="grey90",high = "red") + ggtitle("Number of common genes in CBX Purkinje Gaba")
+```
+```{r}
+int <- Reduce(intersect, cbx_purkinjie)
+
+# no genes intersect in all 3 datasets for CBX purkinje Gaba cell type 
+```
+
+## Additional visualizations
 
 ## Heatmap (intersection of genes)
 ```{r}
