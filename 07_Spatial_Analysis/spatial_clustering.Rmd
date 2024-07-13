@@ -19,8 +19,10 @@ library(scran)
 library(scater)
 library(dplyr)
 library(Seurat)
+library(dbplyr)
 ```
 
+## Testing with their data 
 ```{r}
 dlpfc <- getRDS("2020_maynard_prefrontal-cortex", "151673")
 
@@ -54,7 +56,7 @@ clusterPlot(dlpfc, label=labels, palette=NULL, size=0.05) +
   labs(title="BayesSpace")
 ```
 
-
+## Our data 
 
 ## Pre-processing cosmx seurat object 
 ```{r}
