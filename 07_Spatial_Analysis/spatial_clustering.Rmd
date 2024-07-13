@@ -1,0 +1,163 @@
+---
+title: "spatial_clustering"
+output: html_document
+date: "2024-07-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Spatial clustering of spatial data using BayesSpace 
+
+## Load libraries 
+```{r}
+library(BayesSpace)
+library(ggplot2)
+library(SingleCellExperiment)
+library(scran)
+library(scater)
+library(dplyr)
+library(Seurat)
+```
+
+```{r}
+dlpfc <- getRDS("2020_maynard_prefrontal-cortex", "151673")
+
+set.seed(101)
+dec <- scran::modelGeneVar(dlpfc)
+top <- scran::getTopHVGs(dec, n = 2000)
+
+set.seed(102)
+dlpfc <- scater::runPCA(dlpfc, subset_row=top)
+
+## Add BayesSpace metadata
+dlpfc <- spatialPreprocess(dlpfc, platform="Visium", skip.PCA=TRUE)
+
+```
+
+```{r}
+q <- 7  # Number of clusters
+d <- 15  # Number of PCs
+
+## Run BayesSpace clustering
+set.seed(104)
+dlpfc <- spatialCluster(dlpfc, q=q, d=d, platform='Visium',
+                        nrep=500, gamma=3, save.chain=TRUE, burn.in = 100)
+
+## We recoded the cluster labels to match the expected brain layers
+labels <- dplyr::recode(dlpfc$spatial.cluster, 3, 4, 5, 6, 2, 7, 1)
+
+## View results
+clusterPlot(dlpfc, label=labels, palette=NULL, size=0.05) +
+  scale_fill_viridis_d(option = "A", labels = 1:7) +
+  labs(title="BayesSpace")
+```
+
+
+
+## Pre-processing cosmx seurat object 
+```{r}
+# load data 
+cosmx <- readRDS(here::here("Data", "cosmx.rds"))
+cosmx_eset <- read.csv(here::here("Data", "rat_brain", "Run5618_RtBrain_tx_file.csv"))
+polygons <- read.csv(here::here("Data", "rat_brain", "Run5618_RtBrain-polygons.csv"))
+
+# create df with cellID_fov column and coordinates only from cosmx_eset
+
+# cosmx_eset
+coord <- cosmx_eset %>%
+  mutate(cellID_fov = paste(cell_ID, fov, sep = "_")) %>%
+  select(cellID_fov, x_global_px, y_global_px) %>% group_by(cellID_fov) %>% slice(1) %>%
+  as.data.frame()
+
+polygons_coord <- polygons %>%
+  mutate(cellID_fov = paste(cellID, fov, sep = "_")) %>%
+  select(cellID_fov, x_local_px, y_local_px) %>% group_by(cellID_fov) %>% slice(1) %>%
+  as.data.frame()
+
+# make cellID_fov as rows 
+rownames(coord) <- coord$cellID_fov
+all_coords <- left_join(coord, polygons_coord, by = "cellID_fov")
+rownames(all_coords) <- coord$cellID_fov
+
+# add coord df to metadata in seurat object
+rownames_cosmx <- rownames(cosmx@meta.data)
+coord_subset <- all_coords[intersect(rownames(all_coords), rownames_cosmx), ]
+cosmx <- AddMetaData(cosmx, metadata = coord_subset[, c("x_global_px", "y_global_px", "x_local_px", "y_local_px")])
+
+# add sample ID to meta data 
+# Load fov annotations
+fov_annotations <- read.csv(here::here("Data", "fov_annotations.csv"))
+fov_annotations$fov <- as.character(fov_annotations$fov)
+
+# Extract the fov information from the Seurat object
+fov_info <- sub(".*_(.*)", "\\1", rownames(cosmx@meta.data))
+
+# Add the fov info as a new column in the Seurat object's metadata
+cosmx@meta.data$fov <- fov_info
+
+# Preserve the original row names
+original_rownames <- rownames(cosmx@meta.data)
+
+# Join the fov annotations to get sample IDs
+metadata_df <- cosmx@meta.data %>%
+  left_join(fov_annotations, by = c("fov" = "fov"))
+
+# Reassign the original row names
+rownames(metadata_df) <- original_rownames
+
+# Update the Seurat object's metadata
+cosmx@meta.data <- metadata_df
+```
+
+## create 4 individual singleCellExperiment objects 
+```{r}
+# Subset the Seurat object for sample "r3"
+cosmx_r3 <- subset(cosmx, subset = id == "r3")
+# To single cell exp
+sce_r3 <- as.SingleCellExperiment(cosmx_r3)
+#colData(sce_r3) <- cbind(colData(sce_r3))
+sce_r3@colData$imagerow <- sce_r3@colData$y_global_px
+sce_r3@colData$row <- sce_r3@colData$y_local_px
+sce_r3@colData$imagecol <- sce_r3@colData$x_global_px
+sce_r3@colData$col <- sce_r3@colData$x_local_px
+```
+
+## Processing the data
+```{r}
+set.seed(101)
+dec <- scran::modelGeneVar(sce_r3)
+top <- scran::getTopHVGs(dec, n = 2000)
+```
+
+```{r}
+set.seed(102)
+sce_r3 <- scater::runPCA(sce_r3, subset_row=top)
+## Add BayesSpace metadata
+sce_r3 <- spatialPreprocess(sce_r3, platform="ST", skip.PCA=TRUE)
+```
+
+## Clustering with BayesSpace 
+```{r}
+q <- 7  # Number of clusters
+d <- 15  # Number of PCs
+
+## Run BayesSpace clustering
+set.seed(104)
+
+
+sce_r3 <- spatialCluster(sce_r3, q=q, d=d,
+                        nrep=500, gamma=3, save.chain=TRUE, burn.in = 100)
+
+## We recoded the cluster labels to match the expected brain layers
+#labels <- dplyr::recode(dlpfc$spatial.cluster, 3, 4, 5, 6, 2, 7, 1)
+
+## View results
+labels <- dplyr::recode(sce_r3$spatial.cluster, 3, 4, 5, 6, 2, 7 ,1 )
+
+clusterPlot(sce_r3, label=labels, palette=NULL, size=0.05) +
+  scale_fill_viridis_d(option = "A", labels = 1:7) +
+  labs(title="BayesSpace")
+```
+

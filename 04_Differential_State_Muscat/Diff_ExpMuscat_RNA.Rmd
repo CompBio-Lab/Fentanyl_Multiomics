@@ -39,8 +39,7 @@ metadata <- rna_atac@meta.data
 # create singleCellExperiment object 
 sce <- SingleCellExperiment(
   assays = list(counts = sct_counts),
-  colData = metadata,
-  metadata = metadata
+  colData = metadata
 )
 
 sce 
