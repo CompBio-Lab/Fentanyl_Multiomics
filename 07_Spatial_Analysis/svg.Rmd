@@ -1,0 +1,279 @@
+---
+title: "DESpace_svg"
+output: html_document
+date: "2024-07-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Spatially Variable Genes using Voyager 
+
+## Load libraries 
+```{r}
+library(Voyager)
+library(SpatialFeatureExperiment)
+library(rjson)
+library(Matrix)
+library(RBioFormats)
+library(SingleCellExperiment)
+library(SpatialExperiment)
+library(scater) # devel version of plotExpression
+library(scran)
+library(bluster)
+library(ggplot2)
+library(patchwork)
+library(stringr)
+library(spdep)
+library(BiocParallel)
+library(BiocSingular)
+library(tidyverse)
+library(ComplexHeatmap)
+library(sfarrow)
+library(hexbin)
+library(fgsea)
+library(cowplot)
+```
+
+## Load data 
+```{r}
+(sfe <- readCosMX(here::here("Data", "rat_brain"), add_molecules = TRUE))
+colData(sfe)$nCounts <- colSums(counts(sfe))
+colData(sfe)$nGenes <- colSums(counts(sfe) != 0)
+```
+
+## Plot expression 
+```{r}
+theme_set(theme_bw())
+plotGeometry(sfe, MARGIN = 2L, type = "cellSeg")
+# plot cell density 
+plotCellBin2D(sfe, hex = TRUE)
+```
+
+## Quality Control 
+```{r}
+# Function to plot violin plot for distribution and spatial at once
+plot_violin_spatial <- function(sfe, feature) {
+  violin <- plotColData(sfe, feature, point_fun = function(...) list())
+  spatial <- plotSpatialFeature(sfe, feature, colGeometryName = "centroids",
+                                scattermore = TRUE, pointsize = 4)
+  violin + spatial +
+    plot_layout(widths = c(1, 2))
+}
+
+# Number of transcript spots detected per cell 
+plot_violin_spatial(sfe, "nCounts")
+summary(sfe$nCounts)
+```
+
+```{r}
+n_panel <- 960
+colData(sfe)$nCounts_normed <- sfe$nCounts/n_panel
+colData(sfe)$nGenes_normed <- sfe$nGenes/n_panel
+plotColDataHistogram(sfe, c("nCounts_normed", "nGenes_normed"))
+plot_violin_spatial(sfe, "nGenes")
+
+# How nCounts relates to nGenes 
+plotColData(sfe, x = "nCounts", y = "nGenes", bins = 100)
+```
+
+```{r}
+# Nature of cells without transcripts 
+colData(sfe)$is_empty <- colData(sfe)$nCounts < 1
+plotSpatialFeature(sfe, "is_empty", "cellSeg")
+
+plotColData(sfe, x = "Area", y = "is_empty")
+
+# Cell area distribution 
+plot_violin_spatial(sfe, "Area")
+
+# How does area relate to total counts
+plotColData(sfe, x = "nCounts", y = "Area", bins = 100) + theme_bw()
+
+# Number of negative control probes
+neg_inds <- str_detect(rownames(sfe), "^NegPrb")
+sum(neg_inds)
+
+colData(sfe)$prop_neg <- colSums(counts(sfe)[neg_inds,])/colData(sfe)$nCounts
+
+plot_violin_spatial(sfe, "prop_neg")
+
+plotColData(sfe, x = "nCounts",y = "prop_neg", bins = 100)
+
+# The zeros are removed
+plotColDataHistogram(sfe, "prop_neg") +
+  scale_x_log10()
+
+
+# Remove low quality cells
+(sfe <- sfe[,!sfe$is_empty & sfe$prop_neg < 0.1])
+
+## remove negative and custom targets
+# sfe <- sfe[-grep("Neg|Custom", rownames(rowData(sfe))), ]
+
+```
+
+### Markers
+```{r}
+plotSpatialFeature(sfe, c("AspectRatio", "Mean.Histone_H3", "Max.Histone_H3",
+                          "Mean.18s_rRNA","Max.18s_rRNA", "Mean.GFAP", "Max.GFAP",
+                          "Mean.DAPI", "Max.DAPI"),
+                   colGeometryName = "centroids", ncol = 2, scattermore = TRUE, pointsize = 2)
+
+```
+
+### Genes 
+```{r}
+rowData(sfe)$means <- rowMeans(counts(sfe))
+rowData(sfe)$vars <- rowVars(counts(sfe))
+rowData(sfe)$is_neg <- neg_inds
+
+plotRowData(sfe, x = "means", y = "vars", bins = 50) +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  scale_x_log10() + scale_y_log10() +
+  annotation_logticks() +
+  coord_equal()
+
+as.data.frame(rowData(sfe)[neg_inds,]) |> 
+  ggplot(aes(means, vars)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  scale_x_log10() + scale_y_log10() +
+  annotation_logticks() +
+  coord_equal()
+
+plotRowData(sfe, x = "means", y = "is_neg") +
+  scale_y_log10() +
+  annotation_logticks(sides = "b")
+
+```
+
+## Moran's I
+
+```{r}
+# split samples 
+fov_ann <- read.csv("Data/fov_annotations.csv", row.names = 1)
+fov <- sapply(strsplit(colnames(sfe), "_"), function(i) i[[2]])
+
+drug0 <- fov_ann %>% 
+  group_by(id, drug, sex) %>% 
+  slice(1)
+drug <- drug0$drug
+names(drug) <- drug0$id
+```
+
+```{r}
+# R3
+sfe_r3 <- sfe[, fov %in% rownames(fov_ann)[fov_ann$id == "r3"]]
+sfe_r3 <- logNormCounts(sfe_r3)
+colGraph(sfe_r3, "knn5") <- findSpatialNeighbors(sfe_r3, method = "knearneigh",
+                                                 dist_type = "idw", k = 5, style = "W")
+sfe_r3 <- runMoransI(sfe_r3, features = rownames(sfe_r3), BPPARAM = MulticoreParam(2))
+
+# R4
+sfe_r4 <- sfe[, fov %in% rownames(fov_ann)[fov_ann$id == "r4"]]
+sfe_r4 <- logNormCounts(sfe_r4)
+colGraph(sfe_r4, "knn5") <- findSpatialNeighbors(sfe_r4, method = "knearneigh",
+                                                 dist_type = "idw", k = 5, style = "W")
+sfe_r4 <- runMoransI(sfe_r4, features = rownames(sfe_r4), BPPARAM = MulticoreParam(2))
+
+# R15
+sfe_r15 <- sfe[, fov %in% rownames(fov_ann)[fov_ann$id == "r15"]]
+sfe_r15 <- logNormCounts(sfe_r15)
+colGraph(sfe_r15, "knn5") <- findSpatialNeighbors(sfe_r15, method = "knearneigh",
+                                                  dist_type = "idw", k = 5, style = "W")
+sfe_r15 <- runMoransI(sfe_r15, features = rownames(sfe_r15), BPPARAM = MulticoreParam(2))
+
+# R16
+sfe_r16 <- sfe[, fov %in% rownames(fov_ann)[fov_ann$id == "r16"]]
+sfe_r16 <- logNormCounts(sfe_r16)
+colGraph(sfe_r16, "knn5") <- findSpatialNeighbors(sfe_r16, method = "knearneigh",
+                                                  dist_type = "idw", k = 5, style = "W")
+sfe_r16 <- runMoransI(sfe_r16, features = rownames(sfe_r16), BPPARAM = MulticoreParam(2))
+
+```
+
+```{r}
+moran <- data.frame(r3=rowData(sfe_r3)$moran_sample01,
+                    r4=rowData(sfe_r4)$moran_sample01,
+                    r15=rowData(sfe_r15)$moran_sample01,
+                    r16=rowData(sfe_r16)$moran_sample01)
+rownames(moran) <- rownames(rowData(sfe_r3))
+moran[is.na(moran)] <- 0
+
+morandf <- moran %>% 
+  mutate(gene = rownames(.)) %>% 
+  gather(id, moranI, -gene) %>% 
+  mutate(drug = drug[id]) %>% 
+  group_by(gene, drug) %>% 
+  summarise(avg = mean(moranI)) %>% 
+  spread(drug, avg) %>% 
+  mutate(diff = Fentanyl-Saline) %>% 
+  arrange(desc(diff)) %>% 
+  filter(!(gene %in% grep("Neg|Custom", gene, value = TRUE)))
+
+```
+
+## Fast gene set enrichment analysis 
+```{r}
+nano_pathways <- read.csv(here::here("Data", "LBL-11179-03-Mouse-Neuroscience-Panel-Gene-List.csv"),
+                          row.names = 1)
+nanopathways <- lapply(3:ncol(nano_pathways), function(i){
+  x <- nano_pathways[, i]
+  rownames(nano_pathways)[x == "+"]
+})
+names(nanopathways) <- colnames(nano_pathways)[3:ncol(nano_pathways)]
+
+ranks <- morandf$diff
+names(ranks) <- morandf$gene
+
+res <- fgsea(pathways = nanopathways, stats = ranks,
+             minSize  = 5, maxSize  = 500)
+res <- res[order(res$pval), ]
+
+df <- as.data.frame(subset(morandf, gene %in% nanopathways$Cell.Typing))
+rownames(df) <- df$gene
+Heatmap(df[1:20, c(2:3)])
+
+```
+
+## Genes with highest Moran's I
+```{r}
+genes <- df$gene[order(abs(df$diff), decreasing = TRUE)][1:5]
+for(gene in genes){
+  pr3 <- plotSpatialFeature(sfe_r3, gene, colGeometryName = "centroids", 
+                            scattermore = TRUE, ncol = 1, pointsize = 6,
+                            hex=TRUE)
+  pr4 <- plotSpatialFeature(sfe_r4, gene, colGeometryName = "centroids", 
+                            scattermore = TRUE, ncol = 1, pointsize = 6)
+  pr15 <- plotSpatialFeature(sfe_r15, gene, colGeometryName = "centroids", 
+                             scattermore = TRUE, ncol = 1, pointsize = 6)
+  pr16 <- plotSpatialFeature(sfe_r16, gene, colGeometryName = "centroids", 
+                             scattermore = TRUE, ncol = 1, pointsize = 6)
+  mi <- round(moran[gene,],2)
+  p <- plot_grid(pr15, pr4, pr3, pr16, 
+                 labels = c(paste0("Fentanyl-r15 (I=", mi["r15"], ")"), 
+                            paste0("Fentanyl-r4 (I=", mi["r4"], ")"),
+                            paste0("Saline-r3 (I=", mi["r3"], ")"), 
+                            paste0("Saline-r16 (I=", mi["r16"], ")")),
+                 ncol=2)
+  ggsave(here::here("Data", paste0("svg_", gene, ".png")), p, bg="white")
+}
+```
+
+```{r}
+# https://github.com/hagenaue/Brain_GMT
+brain0 <- read.csv(here::here("Data", "BrainGMTv2_RatOrthologs.csv"), header = FALSE)
+brain <- lapply(1:nrow(brain0), function(i){
+  x <- na.omit(as.character(brain0[i,-1]))
+  unique(x[x!="" & x != "NA"])
+})
+names(brain) <- brain0$V1
+res <- fgsea(pathways = brain, stats = ranks,
+             minSize  = 5, maxSize  = 3000,
+              )
+res <- res[order(res$pval), ]
+```
+
+
