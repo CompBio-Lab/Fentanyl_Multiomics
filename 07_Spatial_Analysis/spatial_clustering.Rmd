@@ -20,127 +20,173 @@ library(scater)
 library(dplyr)
 library(Seurat)
 library(dbplyr)
+library(tidyverse)
+library(reticulate)
+library(patchwork)
 ```
 
-## Pre-processing cosmx seurat object 
+## Load sfe object from svg analysis 
 ```{r}
-# load data 
-cosmx <- readRDS(here::here("Data", "cosmx.rds"))
-cosmx_eset <- read.csv(here::here("Data", "rat_brain", "Run5618_RtBrain_tx_file.csv"))
-polygons <- read.csv(here::here("Data", "rat_brain", "Run5618_RtBrain-polygons.csv"))
-
-# create df with cellID_fov column and coordinates only from cosmx_eset
-
-# cosmx_eset
-coord <- cosmx_eset %>%
-  mutate(cellID_fov = paste(cell_ID, fov, sep = "_")) %>%
-  select(cellID_fov, x_global_px, y_global_px) %>% group_by(cellID_fov) %>% slice(1) %>%
-  as.data.frame()
-
-polygons_coord <- polygons %>%
-  mutate(cellID_fov = paste(cellID, fov, sep = "_")) %>%
-  select(cellID_fov, x_local_px, y_local_px) %>% group_by(cellID_fov) %>% slice(1) %>%
-  as.data.frame()
-
-# make cellID_fov as rows 
-rownames(coord) <- coord$cellID_fov
-all_coords <- left_join(coord, polygons_coord, by = "cellID_fov")
-rownames(all_coords) <- coord$cellID_fov
-
-# add coord df to metadata in seurat object
-rownames_cosmx <- rownames(cosmx@meta.data)
-coord_subset <- all_coords[intersect(rownames(all_coords), rownames_cosmx), ]
-cosmx <- AddMetaData(cosmx, metadata = coord_subset[, c("x_global_px", "y_global_px", "x_local_px", "y_local_px")])
-
-# add sample ID to meta data 
-# Load fov annotations
-fov_annotations <- read.csv(here::here("Data", "fov_annotations.csv"))
-fov_annotations$fov <- as.character(fov_annotations$fov)
-
-# Extract the fov information from the Seurat object
-fov_info <- sub(".*_(.*)", "\\1", rownames(cosmx@meta.data))
-
-# Add the fov info as a new column in the Seurat object's metadata
-cosmx@meta.data$fov <- fov_info
-
-# Preserve the original row names
-original_rownames <- rownames(cosmx@meta.data)
-
-# Join the fov annotations to get sample IDs
-metadata_df <- cosmx@meta.data %>%
-  left_join(fov_annotations, by = c("fov" = "fov"))
-
-# Reassign the original row names
-rownames(metadata_df) <- original_rownames
-
-# Update the Seurat object's metadata
-cosmx@meta.data <- metadata_df
+sfe <- readRDS(here::here("Data", "sfe.rds"))
 ```
 
-## convert seurat to singlecell experiment 
+## Convert sfe to sce for BayesSpace analysis 
 ```{r}
-# To single cell exp
-sce <- as.SingleCellExperiment(cosmx)
-#colData(sce_r3) <- cbind(colData(sce_r3))
-sce@colData$imagerow <- sce@colData$y_global_px
-sce@colData$row <- sce@colData$y_local_px
-sce@colData$imagecol <- sce@colData$x_global_px
-sce@colData$col <- sce@colData$x_local_px
+set.seed(100)
+sce.combined <- SingleCellExperiment(
+  assays = list(counts = counts(sfe)),
+  rowData = rowData(sfe),
+  colData = colData(sfe))
+colData(sce.combined)$row <- spatialCoords(sfe)[, "CenterX_global_px"]
+colData(sce.combined)$col <- spatialCoords(sfe)[, "CenterY_global_px"]
+fov_ann <- read.csv("Data/fov_annotations.csv", row.names = 1)
+colData(sce.combined)$sample_id <- fov_ann[colData(sce.combined)$fov, "id"]
+colData(sce.combined)$drug <- fov_ann[colData(sce.combined)$fov, "drug"]
+sce.combined <- scuttle::addPerCellQC(sce.combined)
+
 ```
 
-## Processing the data
+## Quality Control 
 ```{r}
-set.seed(101)
-dec <- scran::modelGeneVar(sce)
-top <- scran::getTopHVGs(dec, n = 2000)
-
-set.seed(102)
-sce <- scater::runPCA(sce, subset_row=top)
-## Add BayesSpace metadata
-sce <- spatialPreprocess(sce, skip.PCA=TRUE)
+par(mfrow = c(1, 2))
+hist(colData(sce.combined)$sum)
+hist(colData(sce.combined)$detected)
+# remove combined set of low-quality spots
+sce.combined <- sce.combined[, !(colData(sce.combined)$sum < 10 |
+                                   colData(sce.combined)$detected < 5)]
 ```
 
-## Clustering with BayesSpace 
+## Pre-processing the data 
 ```{r}
-q <- 7  # Number of clusters
-d <- 30  # Number of PCs
+sce.combined = spatialPreprocess(sce.combined, platform="ST", assay.type = "counts",
+                                 n.PCs=7, n.HVGs=500, log.normalize=FALSE) 
 
-## Run BayesSpace clustering
-set.seed(104)
+sce.combined = runUMAP(sce.combined, dimred = "PCA")
+colnames(reducedDim(sce.combined, "UMAP")) = c("UMAP1", "UMAP2")
 
+ggplot(data.frame(reducedDim(sce.combined, "UMAP")), 
+       aes(x = UMAP1, y = UMAP2, color = factor(sce.combined$sample_id))) +
+  geom_point(size = 0.7) +
+  labs(color = "Sample") +
+  theme_bw()
+```
 
-sce <- spatialCluster(sce, q=q, d=d,
-                        nrep=500, gamma=3, save.chain=TRUE, burn.in = 100)
+## Clustering 
+```{r}
+# selecting the number of clusters 
+sce.combined <- qTune(sce.combined, qs=seq(2, 10), platform="ST", d=7)
+qPlot(sce.combined)
 
-#labels <- dplyr::recode(sce$spatial.cluster, 3, 4, 5, 6, 2, 7 ,1 )
+# clustering with BayesSpace 
+sce.combined = spatialCluster(sce.combined, 
+                              use.dimred = "PCA", 
+                              q = 9, nrep = 1000,
+                              burn.in = 10,
+                              platform = "ST") #use HARMONY
+
+# visualizing spatial clusters 
+clusterPlot(sce.combined,
+            label="spatial.cluster") + #make sure no overlap between samples
+  labs(fill = "Sample", title = "Offset check")
+
+sce.combined = spatialCluster(sce.combined, use.dimred = "PCA", q = 7, nrep = 1000, burn.in = 100) #use HARMONY
+
+clusterPlot(sce.combined, color = NA) + #plot clusters
+  labs(title = "BayesSpace joint clustering")
 ```
 
 
+## MapMyCells to add cell type labels 
 ```{r}
+# library(reticulate)
+# use_condaenv(condaenv = '/Users/rishikadaswani/anaconda3/envs/cellanno', required = TRUE)
+# 
+# library(anndata)
+# minimal_adata <- t(counts(sce.combined))
+# ad <- AnnData(
+#   X = minimal_adata,
+#   obs = data.frame(group = rownames(minimal_adata), row.names = rownames(minimal_adata)),
+#   var = data.frame(type = colnames(minimal_adata), row.names = colnames(minimal_adata))
+# )
+# write_h5ad(ad,here::here('rna_fent_counts.h5ad'), compression='gzip')
+```
 
-# Extract spatial coordinates and cluster labels
-spatial_data <- as.data.frame(colData(sce))
-spatial_data$labels <- labels  # Replace 'labels' with your actual cluster labels
+```{r}
+# load input from above 
+cellann0 <- read.csv(here::here("Data", "rna_fent_counts_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1721032925823", "rna_fent_counts_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1721032925823.csv"), header = FALSE)
+cellann <- cellann0[-c(1:5), ]
+colnames(cellann) <- as.character(cellann0[5,])
+cc <- cellann$class_name
+names(cc) <- cellann$cell_id
 
-# Plot using ggplot2
-ggplot(spatial_data, aes(x = imagecol, y = imagerow, color = factor(spatial.cluster))) +
-  geom_point(size = 0.5) +
-  scale_color_viridis_d(option = "A", labels = 1:7) +
-  labs(title = "BayesSpace Clustering") +
-  theme_minimal()
+colData(sce.combined)$celltype <- cc[rownames(colData(sce.combined))]
 
-ggplot(spatial_data, aes(x = imagecol, y = imagerow, color = factor(spatial.cluster))) +
+# plot spatial clusters 
+colData(sce.combined) %>% 
+  as.data.frame() %>% 
+  ggplot(aes(x = row, y = col, color = factor(spatial.cluster))) +
+  geom_point(size=0.5) +
+  facet_wrap(~sample_id, scales = "free") +
+  theme(legend.position = "bottom")
+```
+
+
+```{r}
+## plot logFC by spatial cluster
+drug0 <- fov_ann %>% 
+  group_by(id, drug, sex) %>% 
+  slice(1)
+drug <- factor(drug0$drug, levels = c("Saline", "Fentanyl"))
+names(drug) <- drug0$id
+
+b=colData(sce.combined) %>% 
+  as.data.frame()  %>%
+  dplyr::select(spatial.cluster, sample_id, celltype) %>% 
+  group_by(spatial.cluster, sample_id, celltype) %>%
+  summarise(n = n()) %>%
+  spread(sample_id, n)
+c = na.omit(b)
+
+sig_spatial <- c %>% 
+  group_by(spatial.cluster, celltype) %>% 
+  nest() %>% 
+  mutate(pval = purrr::map(data, ~{
+    x <- as.numeric(.)
+    coef(summary(lm(x~drug[names(.)])))[2, "Pr(>|t|)"]
+  })) %>% 
+  unnest(pval) %>% 
+  arrange(pval) %>% 
+  mutate(adjpval = p.adjust(pval, "BH")) %>% 
+  mutate(sig = -log10(pval))
+
+d0 = sig_spatial %>% 
+  dplyr::select(spatial.cluster, celltype, adjpval) %>% 
+  spread(spatial.cluster, adjpval, fill = 1)
+
+d <- as.data.frame(d0[, -1])
+rownames(d) <- sapply(strsplit(d0$celltype, " "), function(i) paste(i[-1], collapse = " "))
+pvalHeatmap(as.matrix(d))
+```
+
+```{r}
+colData(sce.combined) %>% 
+  ggplot(aes(x = row, y = col, color = factor(spatial.cluster))) +
   geom_point() +
-  facet_wrap(~ id, scales = "free") +
-  scale_color_viridis_d(option = "A") +  # Adjust color scale as needed
-  labs(title = "BayesSpace Clustering", x = "Image Row", y = "Image Column") +
-  theme_minimal() +
+  facet_wrap(~sample_id, scales = "free") +
   theme(legend.position = "bottom")
 
+colData(sce.combined) %>% 
+  as.data.frame() %>% 
+  filter(spatial.cluster %in% c("1")) %>% 
+  filter(celltype %in% c("12 CNU-HYa Glut", "01 IT-ET Glut")) %>% 
+  ggplot(aes(x = row, y = col, color = factor(celltype))) +
+  geom_point() +
+  facet_wrap(~sample_id, scales = "free") +
+  theme(legend.position = "bottom")
 ```
 
 ## save sce as an rds object 
 ```{r}
-saveRDS(sce, file = here::here("Data", "sce.rds"))
+saveRDS(sce.combined, file = here::here("Data", "sce.rds"))
 ```
 

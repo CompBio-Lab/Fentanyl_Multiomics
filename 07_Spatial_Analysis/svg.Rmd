@@ -276,4 +276,9 @@ res <- fgsea(pathways = brain, stats = ranks,
 res <- res[order(res$pval), ]
 ```
 
+## Save sfe object as an rds 
+```{r}
+saveRDS(sfe, file = here::here("Data", "sfe.rds"))
+```
+
 
