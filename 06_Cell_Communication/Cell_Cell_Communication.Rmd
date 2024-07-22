@@ -127,7 +127,8 @@ PlotORA(
 ## Build Network of cell-cell communications 
 ```{r}
 BuildNetwork(
-  object = scdiffcom_object
+  object = scdiffcom_object,
+  layout_type = "conventional"
 )
 
 ```

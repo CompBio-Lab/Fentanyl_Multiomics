@@ -135,7 +135,7 @@ colData(sce.combined) %>%
 ## plot logFC by spatial cluster
 drug0 <- fov_ann %>% 
   group_by(id, drug, sex) %>% 
-  slice(1)
+  dplyr::slice(1)
 drug <- factor(drug0$drug, levels = c("Saline", "Fentanyl"))
 names(drug) <- drug0$id
 
@@ -169,20 +169,28 @@ pvalHeatmap(as.matrix(d))
 ```
 
 ```{r}
-colData(sce.combined) %>% 
-  ggplot(aes(x = row, y = col, color = factor(spatial.cluster))) +
+coldata <- colData(sce.combined) %>% 
+  as.data.frame 
+coldata$drug = drug[coldata$sample_id]
+coldata %>% 
+  mutate(drug_id = paste(drug, as.character(sample_id), sep="_"),
+         spatial_cluster = factor(spatial.cluster)) %>% 
+  ggplot(aes(x = row, y = col, color = spatial_cluster)) +
   geom_point() +
-  facet_wrap(~sample_id, scales = "free") +
-  theme(legend.position = "bottom")
+  facet_wrap(~drug_id, scales = "free") +
+  theme(legend.position = "bottom") +
+  xlab("x coordinate") +
+  ylab("y coordinate")
 
 colData(sce.combined) %>% 
   as.data.frame() %>% 
-  filter(spatial.cluster %in% c("1")) %>% 
-  filter(celltype %in% c("12 CNU-HYa Glut", "01 IT-ET Glut")) %>% 
+  filter(spatial.cluster %in% c("4")) %>% 
+  filter(celltype %in% c("03 OB-CR Glut", "23 P Glut")) %>% 
   ggplot(aes(x = row, y = col, color = factor(celltype))) +
   geom_point() +
   facet_wrap(~sample_id, scales = "free") +
   theme(legend.position = "bottom")
+
 ```
 
 ## save sce as an rds object 

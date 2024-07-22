@@ -153,12 +153,12 @@ plotRowData(sfe, x = "means", y = "is_neg") +
 
 ```{r}
 # split samples 
-fov_ann <- read.csv("Data/fov_annotations.csv", row.names = 1)
+fov_ann <- read.csv(here::here("Data", "fov_annotations.csv"), row.names = 1)
 fov <- sapply(strsplit(colnames(sfe), "_"), function(i) i[[2]])
 
 drug0 <- fov_ann %>% 
   group_by(id, drug, sex) %>% 
-  slice(1)
+  dplyr::slice(1)
 drug <- drug0$drug
 names(drug) <- drug0$id
 ```
