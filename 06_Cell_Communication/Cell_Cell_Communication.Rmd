@@ -18,6 +18,7 @@ library(data.table)
 library(ggplot2)
 library(future)
 library(ggrepel)
+library(here)
 ```
 
 ## Load data 
@@ -125,12 +126,20 @@ PlotORA(
 ```
 
 ## Build Network of cell-cell communications 
+
 ```{r}
-BuildNetwork(
+n <- BuildNetwork(
   object = scdiffcom_object,
   layout_type = "conventional"
 )
 
+# Customize the network to have a white background using custom CSS
+n <- n %>%
+  htmlwidgets::onRender("
+    function(el, x) {
+      el.style.background = 'white';
+    }
+  ")
 ```
 
 

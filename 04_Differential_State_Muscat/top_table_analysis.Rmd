@@ -17,6 +17,8 @@ library(dplyr)
 library(circlize)
 library(tidyr)
 library(ggVennDiagram)
+library(ggplot2)
+library(cowplot)
 ```
 
 ## Load 3 top tables (gex, atac and gene activity)
@@ -24,6 +26,60 @@ library(ggVennDiagram)
 top_gex <- readRDS(here::here("Data", "topfil_GEX.rds"))
 top_ga <- readRDS(here::here("Data", "topfil_GA.rds"))
 top_atac <- readRDS(here::here("Data", "topfil_ATAC.rds"))
+```
+
+## number of DEGs within each cell type for all 3 datasets 
+```{r}
+top_gex$dat <- "GEX"
+top_ga$dat <- "GA"
+top_atac$dat <- "ATAC"
+
+gex_plot <- top_gex %>% 
+  mutate(direction = ifelse(logFC > 0, "UP", "DOWN")) %>% 
+  group_by(dat, cluster_id, direction) %>% 
+  filter(p_adj.loc < 0.3) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(y = cluster_id, x = count, fill = direction)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~dat, scales = "free") +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.text = element_text(face="bold"),
+        strip.text = element_text(face="bold")) +
+  ylab("") +
+  xlab("Number of genes (FDR < 30%)")
+ga_plot <- top_ga %>% 
+  mutate(direction = ifelse(logFC > 0, "UP", "DOWN")) %>% 
+  group_by(dat, cluster_id, direction) %>% 
+  filter(p_adj.loc < 0.3) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(y = cluster_id, x = count, fill = direction)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~dat, scales = "free") +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.text = element_text(face="bold"),
+        strip.text = element_text(face="bold")) +
+  ylab("") +
+  xlab("Number of genes (FDR < 30%)")
+atac_plot <- top_atac %>% 
+  mutate(direction = ifelse(logFC > 0, "UP", "DOWN")) %>% 
+  group_by(dat, cluster_id, direction) %>% 
+  filter(p_adj.loc < 0.3) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(y = cluster_id, x = count, fill = direction)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~dat, scales = "free") +
+  scale_x_log10() +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.text = element_text(face="bold"),
+        strip.text = element_text(face="bold")) +
+  ylab("cell-types") +
+  xlab("Number of fragments (FDR < 30%)")
+
+a = cowplot::plot_grid(gex_plot, ga_plot, ncol=1)
+cowplot::plot_grid(atac_plot, a)
 ```
 
 
