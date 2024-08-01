@@ -10,7 +10,7 @@ This repository includes SnRNAseq and SnATACseq analysis pipeline on the rat mid
 * Cell specific differential state analysis (*Muscat*) 
 * Enriched Pathways (*EnrichR*)
 * Cell-cell communication (*scDiffCom*)
-* Spatial data analysis for validation (*CosMx*) 
+* Spatial data analysis (*CosMx*) 
 
 ## Reproducibility 
 In order to reproduce our analysis, we have created docker images for certain steps (fastqc, cellranger-arc, scCODA, and MultiVI). The Docker and Makefiles can be found in the Data_Processing folder. Follow the steps below to build the docker image locally or through UBC ARC Sockeye. 
